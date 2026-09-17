@@ -19,12 +19,23 @@ const SHOP = {
 }
 
 function billNo(id) { return 'MM-' + id.slice(-6).toUpperCase() }
+
+// ── Effective billing date ──────────────────────────────────────────
+// Bills store a `billing_date` (date-only, picked at creation — can be
+// backdated). Older bills created before this field existed won't have
+// it, so fall back to `created_at`. The +05:30 anchor keeps the date
+// stable in IST regardless of the viewer's own timezone.
+function billingDateObj(bill) {
+  return bill.billing_date
+    ? new Date(bill.billing_date + 'T00:00:00+05:30')
+    : new Date(bill.created_at)
+}
 // ── Print receipt ─────────────────────────────────────────────────
 // Builds a 58mm-optimised HTML receipt, opens it in a new tab, and
 // calls window.print() automatically — Android then shows the native
 // print dialog where the paired Bluetooth printer appears directly.
 function printBill(bill, items) {
-  const dateStr  = new Date(bill.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'Asia/Kolkata' })
+  const dateStr  = billingDateObj(bill).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'Asia/Kolkata' })
   const timeStr  = new Date(bill.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' })
   const subtotal = Number(bill.total_amount) + Number(bill.discount_amount || 0)
   const discPct  = Number(bill.discount_percent || 0)
@@ -179,7 +190,7 @@ async function generateInvoicePDF(bill, items) {
   const W = 210, H = 297
   let y = 0
 
-  const dateStr = new Date(bill.created_at).toLocaleDateString('en-IN', {
+  const dateStr = billingDateObj(bill).toLocaleDateString('en-IN', {
     day: '2-digit', month: 'short', year: 'numeric', timeZone: 'Asia/Kolkata'
   })
   const subtotal = Number(bill.total_amount) + Number(bill.discount_amount || 0)
@@ -342,7 +353,7 @@ function WhatsAppModal({ bill, items, onClose }) {
       setPdfUrl(url)
 
       const total    = Number(bill.total_amount).toFixed(2)
-      const dateStr  = new Date(bill.created_at).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' })
+      const dateStr  = billingDateObj(bill).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' })
       const message  = `🧾 *Mayur Masala Center*\n\nDear *${bill.customer_name}*,\n\nYour bill ${billNo(bill.id)} dated ${dateStr}\n💰 Total: *Rs. ${total}*\n\nDownload your invoice:\n${url}\n\nThank you for shopping with us! 🙏\n_Mayur Masala Center & Pooja Bhandar_`
 
       const waUrl = `https://wa.me/${fullNumber}?text=${encodeURIComponent(message)}`
@@ -580,7 +591,10 @@ function BillDetailModal({ bill: initialBill, onClose, onRefresh, isOwner }) {
         </div>
 
         <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: 16, display: 'flex', flexDirection: 'column', gap: 3 }}>
-          <div>Bill: {billNo(bill.id)} · {new Date(bill.created_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}</div>
+          <div>Bill: {billNo(bill.id)} · {billingDateObj(bill).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'Asia/Kolkata' })} {new Date(bill.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' })}</div>
+          {bill.billing_date && billingDateObj(bill).toDateString() !== new Date(bill.created_at).toDateString() && (
+            <div style={{ fontStyle: 'italic' }}>Backdated · entered on {new Date(bill.created_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}</div>
+          )}
           {bill.created_by && <div>Created by: <span style={{ color: 'var(--teal-dark)', fontWeight: 600 }}>{bill.created_by.split('@')[0]}</span></div>}
           {bill.paid_at && <div>Paid: {new Date(bill.paid_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}</div>}
         </div>
@@ -644,7 +658,16 @@ export default function DashboardPage() {
   const fetchBills = useCallback(async () => {
     const { data, error } = await supabase.from('bills').select('*').order('created_at', { ascending: false })
     if (error) toast('Failed to load bills', 'error')
-    else setBills(data || [])
+    else {
+      // Sort by billing date (newest first) rather than raw insert order,
+      // so a backdated bill lands where it actually belongs in the list.
+      // created_at is the tie-breaker for same-day bills.
+      const sorted = [...(data || [])].sort((a, b) => {
+        const diff = billingDateObj(b) - billingDateObj(a)
+        return diff !== 0 ? diff : new Date(b.created_at) - new Date(a.created_at)
+      })
+      setBills(sorted)
+    }
     setLoading(false)
   }, [toast])
 
@@ -725,7 +748,7 @@ export default function DashboardPage() {
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontWeight: 700, fontSize: '0.925rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{bill.customer_name}</div>
               <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: 2 }}>
-                {billNo(bill.id)} · {new Date(bill.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', timeZone: 'Asia/Kolkata' })} {new Date(bill.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' })}
+                {billNo(bill.id)} · {billingDateObj(bill).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'Asia/Kolkata' })} {new Date(bill.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' })}
               </div>
               {bill.created_by && (
                 <div style={{ fontSize: '0.68rem', marginTop: 2, color: 'var(--teal-dark)', opacity: 0.85 }}>🧑 {bill.created_by.split('@')[0]}</div>
