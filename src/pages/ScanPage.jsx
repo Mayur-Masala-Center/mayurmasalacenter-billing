@@ -4,6 +4,17 @@ import { useToast } from '../components/Toast'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../lib/AuthContext'
 
+// ── Today's date (Asia/Kolkata) as YYYY-MM-DD ──────────────────────
+// Used to default the billing-date picker and to cap it so a bill
+// can't be dated into the future — past dates are fine (backdating).
+function todayIST() {
+  const ist = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }))
+  const y = ist.getFullYear()
+  const m = String(ist.getMonth() + 1).padStart(2, '0')
+  const d = String(ist.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
+}
+
 // ── Barcode scanner hook ──────────────────────────────────────────
 function useBarcodeScanner(videoRef, onDetected, enabled) {
   const rafRef      = useRef(null)
@@ -365,6 +376,7 @@ export default function ScanPage() {
 
   const [step, setStep]                 = useState('start')
   const [customerName, setCustomerName] = useState('')
+  const [billingDate, setBillingDate]   = useState(todayIST())
   const [cart, setCart]                 = useState([])
   const [scannedItem, setScannedItem]   = useState(null)
   const [submitting, setSubmitting]     = useState(false)
@@ -487,11 +499,13 @@ export default function ScanPage() {
 
   const handleSubmit = async () => {
     if (cart.length === 0) return toast('Cart is empty', 'error')
+    if (!billingDate) return toast('Pick a billing date', 'error')
+    if (billingDate > todayIST()) return toast('Billing date cannot be in the future', 'error')
     setSubmitting(true)
     const total = cart.reduce((sum, c) => sum + c.item.price * c.qty, 0)
     const { data: bill, error: billErr } = await supabase
       .from('bills')
-      .insert({ customer_name: customerName.trim(), total_amount: total, status: 'pending', created_by: user?.email ?? '' })
+      .insert({ customer_name: customerName.trim(), total_amount: total, status: 'pending', created_by: user?.email ?? '', billing_date: billingDate })
       .select().single()
     if (billErr) { toast('Failed to create bill', 'error'); setSubmitting(false); return }
     const billItems = cart.map(c => ({
@@ -536,7 +550,21 @@ export default function ScanPage() {
               onKeyDown={e => e.key === 'Enter' && customerName.trim() && setStep('scanning')}
             />
           </div>
-          <button className="btn btn-primary btn-full btn-lg" style={{ marginTop: '8px' }} disabled={!customerName.trim()} onClick={() => setStep('scanning')}>
+          <div className="form-group">
+            <label className="form-label" style={{ color: 'rgba(255,255,255,0.5)' }}>Billing Date</label>
+            <input
+              type="date"
+              className="form-input"
+              style={{ background: 'var(--ink-mid)', border: '1.5px solid rgba(255,255,255,0.1)', color: 'var(--white)', fontSize: '1.05rem', colorScheme: 'dark' }}
+              value={billingDate}
+              max={todayIST()}
+              onChange={e => setBillingDate(e.target.value)}
+            />
+            <div style={{ color: 'rgba(255,255,255,0.35)', fontSize: '0.75rem', marginTop: '4px' }}>
+              Defaults to today — pick a past date to backdate this bill.
+            </div>
+          </div>
+          <button className="btn btn-primary btn-full btn-lg" style={{ marginTop: '8px' }} disabled={!customerName.trim() || !billingDate} onClick={() => setStep('scanning')}>
             Start Scanning →
           </button>
           <button className="btn btn-ghost btn-full" style={{ marginTop: '10px', color: 'rgba(255,255,255,0.4)', borderColor: 'rgba(255,255,255,0.1)' }} onClick={() => navigate('/')}>
@@ -801,6 +829,16 @@ export default function ScanPage() {
           </div>
         </div>
         <div style={{ padding: '16px', maxWidth: 520, margin: '0 auto' }}>
+          <div className="card" style={{ padding: '10px 14px', marginBottom: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+            <label className="form-label" style={{ margin: 0, whiteSpace: 'nowrap' }}>🗓️ Billing Date</label>
+            <input
+              type="date"
+              value={billingDate}
+              max={todayIST()}
+              onChange={e => setBillingDate(e.target.value)}
+              style={{ border: '1.5px solid var(--border)', borderRadius: 'var(--radius-sm)', padding: '6px 8px', fontSize: '0.9rem', fontFamily: 'inherit' }}
+            />
+          </div>
           <ManualItemRow onAdd={handleManualAdd} />
           <div className="card" style={{ padding: 0, overflow: 'hidden', marginTop: 12 }}>
             {cart.length === 0 ? (
@@ -831,7 +869,7 @@ export default function ScanPage() {
           </div>
           <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
             <button className="btn btn-secondary btn-full" onClick={() => setStep('scanning')}>📷 Scan More</button>
-            <button className="btn btn-primary btn-full btn-lg" onClick={handleSubmit} disabled={submitting || cart.length === 0}>
+            <button className="btn btn-primary btn-full btn-lg" onClick={handleSubmit} disabled={submitting || cart.length === 0 || !billingDate || billingDate > todayIST()}>
               {submitting ? '⏳ Submitting…' : '✓ Submit Bill'}
             </button>
           </div>
