@@ -72,9 +72,14 @@ export async function onRequestGet(context) {
   rows.push(text(`Ph: ${SHOP.phone}`, { align: 1, format: 0 }))
   rows.push(text(SOLID))
 
-  // Bill meta — IST timezone explicitly set
+  // Bill meta — IST timezone explicitly set.
+  // `billing_date` is the date picked (possibly backdated) when the bill
+  // was created; older bills without it fall back to created_at.
   const IST = { timeZone: 'Asia/Kolkata' }
-  const dateStr = new Date(bill.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', ...IST })
+  const billingDateObj = bill.billing_date
+    ? new Date(bill.billing_date + 'T00:00:00+05:30')
+    : new Date(bill.created_at)
+  const dateStr = billingDateObj.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', ...IST })
   const timeStr = new Date(bill.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', ...IST })
 
   rows.push(text(`Bill: ${billNo(bill.id)}`, {  format: 0 }))
