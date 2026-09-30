@@ -5,7 +5,7 @@ import { isOwner } from './lib/roles'
 import LoginPage from './pages/LoginPage'
 import HomePage from './pages/HomePage'
 import ItemsPage from './pages/ItemsPage'
-import ScanPage from './pages/ScanPage'
+import BillPage from './pages/BillPage'
 import DashboardPage from './pages/DashboardPage'
 
 function LoadingScreen() {
@@ -77,7 +77,7 @@ function Nav() {
   const { user, signOut } = useAuth()
   const owner = isOwner(user?.email)
 
-  if (location.pathname === '/scan') return null
+  if (location.pathname.startsWith('/bill')) return null
 
   // Short display name — first part of email before @
   const displayName = user?.email?.split('@')[0] ?? ''
@@ -96,8 +96,8 @@ function Nav() {
         <NavLink to="/items" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
           Items
         </NavLink>
-        <NavLink to="/scan" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-          📷 Scan
+        <NavLink to="/bill" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+          🧾 New Bill
         </NavLink>
 
         {/* Dashboard only visible to owners */}
@@ -145,7 +145,9 @@ function AppShell() {
         <Route path="/login"     element={<PublicRoute><LoginPage /></PublicRoute>} />
         <Route path="/"          element={<ProtectedRoute><HomePage /></ProtectedRoute>} />
         <Route path="/items"     element={<ProtectedRoute><ItemsPage /></ProtectedRoute>} />
-        <Route path="/scan"      element={<ProtectedRoute><ScanPage /></ProtectedRoute>} />
+        <Route path="/bill"      element={<ProtectedRoute><BillPage /></ProtectedRoute>} />
+        <Route path="/bill/:id"  element={<ProtectedRoute><BillPage /></ProtectedRoute>} />
+        <Route path="/scan"      element={<Navigate to="/bill" replace />} />
         <Route path="/dashboard" element={<OwnerRoute><DashboardPage /></OwnerRoute>} />
         <Route path="*"          element={<Navigate to="/" replace />} />
       </Routes>

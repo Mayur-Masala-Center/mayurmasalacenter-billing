@@ -2,19 +2,20 @@ import { useNavigate } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/AuthContext'
+import { isOwner } from '../lib/roles'
 
 export default function HomePage() {
   const navigate = useNavigate()
   const { user } = useAuth()
-  const [stats, setStats] = useState({ items: 0, bills: 0, pending: 0 })
+  const [stats, setStats] = useState({ items: 0, bills: 0, drafts: 0 })
 
   useEffect(() => {
     Promise.all([
       supabase.from('items').select('id', { count: 'exact', head: true }),
       supabase.from('bills').select('id', { count: 'exact', head: true }),
-      supabase.from('bills').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
-    ]).then(([items, bills, pending]) => {
-      setStats({ items: items.count || 0, bills: bills.count || 0, pending: pending.count || 0 })
+      supabase.from('bills').select('id', { count: 'exact', head: true }).eq('status', 'draft'),
+    ]).then(([items, bills, drafts]) => {
+      setStats({ items: items.count || 0, bills: bills.count || 0, drafts: drafts.count || 0 })
     })
   }, [])
 
@@ -40,7 +41,7 @@ export default function HomePage() {
           Billing System
         </div>
         <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem', maxWidth: 380 }}>
-          Welcome back{user?.email ? `, ${user.email.split('@')[0]}` : ''}. Manage your store's billing with barcode scanning.
+          Welcome back{user?.email ? `, ${user.email.split('@')[0]}` : ''}. Create, save and print bills quickly.
         </p>
       </div>
 
@@ -49,7 +50,7 @@ export default function HomePage() {
         {[
           { label: 'Items', value: stats.items, icon: '📦' },
           { label: 'Bills', value: stats.bills, icon: '🧾' },
-          { label: 'Pending', value: stats.pending, icon: '⏳' },
+          { label: 'Drafts', value: stats.drafts, icon: '💾' },
         ].map(s => (
           <div key={s.label} style={{
             textAlign: 'center',
@@ -69,14 +70,16 @@ export default function HomePage() {
 
       {/* Actions */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', width: '100%', maxWidth: 340 }}>
-        <button className="btn btn-primary btn-full btn-lg" onClick={() => navigate('/scan')}>
-          📷 Start New Bill
+        <button className="btn btn-primary btn-full btn-lg" onClick={() => navigate('/bill')}>
+          🧾 Start New Bill
         </button>
-        <button className="btn btn-dark btn-full btn-lg" onClick={() => navigate('/dashboard')}>
-          📊 Billing Dashboard
-        </button>
+        {isOwner(user?.email) && (
+          <button className="btn btn-dark btn-full btn-lg" onClick={() => navigate('/dashboard')}>
+            📊 Billing Dashboard
+          </button>
+        )}
         <button className="btn btn-secondary btn-full" onClick={() => navigate('/items')}>
-          📦 Manage Items & Barcodes
+          📦 Manage Items
         </button>
       </div>
 
@@ -85,10 +88,10 @@ export default function HomePage() {
         <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 600, marginBottom: '16px' }}>How it works</div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '12px' }}>
           {[
-            { icon: '📦', label: 'Add Items', desc: 'Create products with auto-generated barcodes' },
-            { icon: '🖨️', label: 'Print Labels', desc: 'Print & stick barcode labels on products' },
-            { icon: '📷', label: 'Scan to Bill', desc: 'Scan items to build the customer\'s cart' },
-            { icon: '💰', label: 'Collect', desc: 'Biller marks payment as received' },
+            { icon: '📦', label: 'Add Items', desc: 'Save item names once for quick picking' },
+            { icon: '✏️', label: 'Build Bill', desc: 'Enter customer, items, price and qty' },
+            { icon: '💾', label: 'Save Draft', desc: 'Keep a bill aside to finish later' },
+            { icon: '🖨️', label: 'Print', desc: 'One tap saves and prints the bill' },
           ].map(s => (
             <div key={s.label} style={{ background: 'var(--white)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '14px 10px', textAlign: 'center' }}>
               <div style={{ fontSize: '1.4rem', marginBottom: '6px' }}>{s.icon}</div>

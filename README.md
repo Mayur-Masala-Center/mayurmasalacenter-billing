@@ -1,16 +1,15 @@
 # 🌶️ Mayur Masala — Billing System
 
-A fast, mobile-friendly billing app with barcode scanning and Supabase Auth login.
+A fast, mobile-friendly manual billing app with Supabase Auth login.
 
 ## Features
 
 - 🔐 **Login / Sign Up / Forgot Password** via Supabase Auth
-- ✅ **Create items** with auto-generated CODE128 barcodes
-- 🖨️ **Print barcode labels** to stick on products
-- 📷 **Scan via mobile camera** — Next / Retake / Done flow
-- 🧾 **Bill overview** — adjust quantities before submission
-- 💰 **Billing dashboard** — mark payments received, realtime updates
-- 📊 Stats for pending and collected amounts
+- 📦 **Item catalog** — save item names once; suggested while billing
+- ✏️ **Manual billing** — type or pick an item, enter price and qty
+- 💾 **Save Draft** — keep a bill aside and finish it later
+- 🖨️ **Print Bill** — one tap saves the bill and sends it to the Bluetooth thermal printer
+- 📊 **Dashboard (owners only)** — see drafts and printed bills, edit drafts, reprint, share on WhatsApp
 
 ---
 
@@ -26,19 +25,17 @@ A fast, mobile-friendly billing app with barcode scanning and Supabase Auth logi
 create table items (
   id uuid default gen_random_uuid() primary key,
   name text not null,
-  price numeric(10,2) not null,
-  barcode text unique not null,
   created_at timestamptz default now()
 );
+create unique index items_name_unique on items (lower(name));
 
 -- Bills table
 create table bills (
   id uuid default gen_random_uuid() primary key,
   customer_name text not null,
   total_amount numeric(10,2) default 0,
-  status text default 'pending' check (status in ('pending', 'paid')),
-  created_at timestamptz default now(),
-  paid_at timestamptz
+  status text default 'draft' check (status in ('draft', 'final')),
+  created_at timestamptz default now()
 );
 
 -- Bill items
@@ -70,7 +67,10 @@ create policy "Auth update bills" on bills for update using (auth.role() = 'auth
 
 create policy "Auth read bill_items"   on bill_items for select using (auth.role() = 'authenticated');
 create policy "Auth insert bill_items" on bill_items for insert with check (auth.role() = 'authenticated');
+create policy "Auth delete bill_items" on bill_items for delete using (auth.role() = 'authenticated');
 ```
+
+> **Upgrading an existing database?** Run `supabase/migrations_manual_billing.sql` once instead, *before* deploying this version.
 
 3. Go to **Authentication → Settings** — email auth is enabled by default
 4. (Optional) Disable "Confirm email" for internal use: **Auth → Settings → Email → uncheck "Enable email confirmations"**
@@ -120,12 +120,13 @@ npm run build
 
 | Step | Who | Action |
 |------|-----|--------|
-| 1 | Manager | Add items in **Items** page |
-| 2 | Manager | Print labels → stick on products |
-| 3 | Staff/Customer | Click **📷 Scan** → enter customer name |
-| 4 | Staff/Customer | Point camera at each product → **Next** to add, **Retake** to redo |
-| 5 | Staff/Customer | **Done** → review overview, adjust qty → **Submit Bill** |
-| 6 | Biller | **Dashboard** → click bill → **💰 Mark as Paid** |
+| 1 | Anyone | (Optional) add item names in **Items** |
+| 2 | Anyone | **🧾 New Bill** → enter customer name and date |
+| 3 | Anyone | Type or pick an item, enter price and qty → **+ Add to Bill** (repeat) |
+| 4 | Anyone | Optionally set a discount %, then **🖨️ Print Bill** (saves and prints) or **💾 Save Draft** |
+| 5 | Owner | **Dashboard → Drafts** → open a draft → **✏️ Edit Draft** → **🖨️ Print Bill** |
+
+Printed bills are locked; they can be reprinted or shared from the Dashboard.
 
 ---
 
@@ -133,14 +134,11 @@ npm run build
 
 - **React + Vite** — SPA
 - **Supabase** — PostgreSQL + Auth + Realtime
-- **JsBarcode** — CODE128 barcode generation
-- **ZXing** — camera barcode scanning
 - **React Router v6** — routing + auth guards
 
 ---
 
 ## Notes
 
-- Camera scanning **requires HTTPS** — works on Vercel, GitHub Pages, and `localhost`
-- Grant camera permission when prompted on mobile
-- Barcodes use CODE128 — also works with handheld USB barcode scanners
+- Printing uses the **Bluetooth Print** Android app via a `my.bluetoothprint.scheme://` deep link (unchanged).
+- Only owners (see `src/lib/roles.js`) can open the Dashboard.
