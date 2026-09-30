@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useToast } from '../components/Toast'
 import { useAuth } from '../lib/AuthContext'
@@ -30,19 +30,21 @@ const roundBtn = {
 }
 
 // Steps: 'start' | 'bill'
-function BillEditor({ draftId }) {
+function BillEditor({ draftId, copyId }) {
   const toast    = useToast()
   const navigate = useNavigate()
   const { user } = useAuth()
 
-  const [step, setStep]                 = useState(draftId ? 'bill' : 'start')
-  const [loadingDraft, setLoadingDraft] = useState(!!draftId)
+  const [step, setStep]                 = useState(draftId || copyId ? 'bill' : 'start')
+  const [loadingDraft, setLoadingDraft] = useState(!!(draftId || copyId))
   const [customerName, setCustomerName] = useState('')
   const [billingDate, setBillingDate]   = useState(todayIST())
   const [cart, setCart]                 = useState([])
   const [discountPct, setDiscountPct]   = useState(0)
   const [saving, setSaving]             = useState(false)
   const [catalog, setCatalog]           = useState([])
+  const [history, setHistory]           = useState({ last: {}, names: [], top: [] })
+  const [recentCustomers, setRecentCustomers] = useState([])
   const [form, setForm]                 = useState({ name: '', price: '', qty: '' })
   const [printPending, setPrintPending] = useState(null)
   const savingRef = useRef(false)
@@ -50,11 +52,34 @@ function BillEditor({ draftId }) {
   const priceRef = useRef(null)
   const qtyRef   = useRef(null)
 
-  // ── Item catalog (names only) for suggestions ──
+  // ── Suggestion data ──
+  // catalog: saved item names. history: what was billed before (last price used per item,
+  // most-billed items). recentCustomers: names from the latest bills.
   useEffect(() => {
     supabase.from('items').select('name').order('name').then(({ data }) => {
       setCatalog((data || []).map(i => i.name))
     })
+    supabase.from('bill_items').select('item_name, item_price').order('created_at', { ascending: false }).limit(1500)
+      .then(({ data }) => {
+        const last = {}, count = {}
+        for (const r of data || []) {
+          const k = String(r.item_name).toLowerCase().trim()
+          if (!(k in last)) last[k] = Number(r.item_price)         // newest row first = last price used
+          count[k] = count[k] || { n: 0, name: String(r.item_name).trim() }
+          count[k].n++
+        }
+        const ranked = Object.values(count).sort((a, b) => b.n - a.n)
+        setHistory({ last, names: ranked.map(x => x.name), top: ranked.slice(0, 8).map(x => x.name) })
+      })
+    supabase.from('bills').select('customer_name').order('created_at', { ascending: false }).limit(300)
+      .then(({ data }) => {
+        const seen = new Set(), out = []
+        for (const r of data || []) {
+          const n = String(r.customer_name || '').trim(), k = n.toLowerCase()
+          if (n && !seen.has(k)) { seen.add(k); out.push(n) }
+        }
+        setRecentCustomers(out.slice(0, 40))
+      })
   }, [])
 
   // ── Reopen a saved draft: /bill/:id ──
@@ -78,6 +103,28 @@ function BillEditor({ draftId }) {
       setLoadingDraft(false)
     })()
   }, [draftId, navigate, toast])
+
+  // ── Repeat an earlier bill: /bill?copy=<id> — same customer + items, as a NEW bill dated today ──
+  useEffect(() => {
+    if (!copyId || draftId) return
+    ;(async () => {
+      const { data: bill } = await supabase.from('bills').select('*').eq('id', copyId).single()
+      if (!bill) {
+        toast('Bill not found', 'error')
+        navigate('/bill', { replace: true })
+        return
+      }
+      const { data: lines } = await supabase.from('bill_items').select('*').eq('bill_id', copyId)
+      setCustomerName(bill.customer_name)
+      setDiscountPct(Number(bill.discount_percent || 0))
+      setCart((lines || []).map(l => ({
+        key: lineKey(l.item_name, Number(l.item_price)),
+        name: l.item_name, price: Number(l.item_price), qty: l.quantity,
+      })))
+      setLoadingDraft(false)
+      toast('Copied — adjust if needed, then print or save')
+    })()
+  }, [copyId, draftId, navigate, toast])
 
   // ── Guard against losing an in-progress bill ──
   const hasUnsavedWork = step === 'bill' && cart.length > 0
@@ -110,11 +157,31 @@ function BillEditor({ draftId }) {
   const cartCount   = cart.reduce((s, c) => s + c.qty, 0)
 
   // ── Cart actions ──
+  const allNames = useMemo(() => {
+    const seen = new Set(), out = []
+    for (const n of [...catalog, ...history.names]) {
+      const k = n.toLowerCase().trim()
+      if (k && !seen.has(k)) { seen.add(k); out.push(n) }
+    }
+    return out
+  }, [catalog, history.names])
+
   const suggestions = useMemo(() => {
     const q = form.name.trim().toLowerCase()
     if (!q) return []
-    return catalog.filter(n => n.toLowerCase().includes(q) && n.toLowerCase() !== q).slice(0, 5)
-  }, [form.name, catalog])
+    return allNames.filter(n => n.toLowerCase().includes(q) && n.toLowerCase() !== q).slice(0, 5)
+  }, [form.name, allNames])
+
+  const lastHint = history.last[form.name.trim().toLowerCase()]   // price used last time, if known
+
+  // Choose an item name: fix its capitalisation, pre-fill the last price used, jump to the next field.
+  const pickName = (raw) => {
+    const typed = raw.trim()
+    const name = allNames.find(n => n.toLowerCase() === typed.toLowerCase()) ?? typed
+    const p = history.last[name.toLowerCase()]
+    setForm(f => ({ ...f, name, price: f.price === '' && p !== undefined ? String(p) : f.price }))
+    ;(p !== undefined || form.price !== '' ? qtyRef : priceRef).current?.focus()
+  }
 
   const addItem = () => {
     const name = form.name.trim()
@@ -133,6 +200,8 @@ function BillEditor({ draftId }) {
 
   const changeQty = (key, delta) => setCart(prev =>
     prev.flatMap(c => c.key !== key ? [c] : (c.qty + delta <= 0 ? [] : [{ ...c, qty: c.qty + delta }])))
+
+  const removeLine = key => setCart(prev => prev.filter(c => c.key !== key))
 
   const resetBill = () => {
     setStep('start'); setCustomerName(''); setBillingDate(todayIST())
@@ -180,9 +249,8 @@ function BillEditor({ draftId }) {
 
   // Leave the editor after a save. Slight delay so nothing touches the
   // page/history in the same instant the printer deep link is launched.
-  const finish = () => setTimeout(() => {
-    if (draftId) navigate('/bill', { replace: true }); else resetBill()
-  }, 300)
+  const leave = () => { if (draftId || copyId) navigate('/bill', { replace: true }); else resetBill() }
+  const finish = () => setTimeout(leave, 300)
 
   const handleSaveDraft = async () => {
     if (savingRef.current) return
@@ -192,7 +260,7 @@ function BillEditor({ draftId }) {
     if (!bill) return
     unsavedRef.current = false
     toast(`Draft saved for ${customerName.trim()}`)
-    if (draftId) navigate('/bill', { replace: true }); else resetBill()
+    leave()
   }
 
   const handlePrint = async () => {
@@ -213,6 +281,15 @@ function BillEditor({ draftId }) {
     finish()
   }
 
+  const discardDraft = async () => {
+    if (!window.confirm('Delete this draft permanently?')) return
+    const { data, error } = await supabase.from('bills').delete().eq('id', draftId).eq('status', 'draft').select('id')
+    if (error || !data?.length) return toast('Could not delete the draft', 'error')
+    unsavedRef.current = false
+    toast('Draft deleted')
+    navigate('/bill', { replace: true })
+  }
+
   const printNow = () => { const bill = printPending; setPrintPending(null); bluetoothPrint(bill); finish() }
   const skipPrint = () => { setPrintPending(null); finish() }
 
@@ -231,6 +308,21 @@ function BillEditor({ draftId }) {
             <input className="form-input" style={darkInput} placeholder="e.g. Ravi Kumar"
               value={customerName} autoFocus onChange={e => setCustomerName(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && customerName.trim() && setStep('bill')} />
+            {(() => {
+              const q = customerName.trim().toLowerCase()
+              const list = recentCustomers.filter(n => !q || (n.toLowerCase().includes(q) && n.toLowerCase() !== q)).slice(0, 5)
+              return list.length > 0 && (
+                <div style={{ marginTop: 8 }}>
+                  <div style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.35)', marginBottom: 4 }}>{q ? 'Matching customers' : 'Recent customers'}</div>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                    {list.map(n => (
+                      <button key={n} className="btn btn-sm" onClick={() => setCustomerName(n)}
+                        style={{ background: 'rgba(255,255,255,0.08)', color: 'var(--white)', border: '1px solid rgba(255,255,255,0.15)' }}>{n}</button>
+                    ))}
+                  </div>
+                </div>
+              )
+            })()}
           </div>
           <div className="form-group">
             <label className="form-label" style={{ color: 'rgba(255,255,255,0.5)' }}>Billing Date</label>
@@ -285,13 +377,15 @@ function BillEditor({ draftId }) {
           <label className="form-label">Item Name</label>
           <input ref={nameRef} className="form-input" placeholder="Type or pick an item" value={form.name} autoFocus
             onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-            onKeyDown={e => e.key === 'Enter' && priceRef.current?.focus()} />
-          {suggestions.length > 0 && (
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
-              {suggestions.map(n => (
-                <button key={n} className="btn btn-secondary btn-sm"
-                  onClick={() => { setForm(f => ({ ...f, name: n })); priceRef.current?.focus() }}>{n}</button>
-              ))}
+            onKeyDown={e => e.key === 'Enter' && pickName(form.name)} />
+          {(suggestions.length > 0 || (!form.name.trim() && history.top.length > 0)) && (
+            <div style={{ marginTop: 8 }}>
+              {!form.name.trim() && <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: 4 }}>Frequent items</div>}
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                {(form.name.trim() ? suggestions : history.top).map(n => (
+                  <button key={n} className="btn btn-secondary btn-sm" onClick={() => pickName(n)}>{n}</button>
+                ))}
+              </div>
             </div>
           )}
           <div style={{ display: 'flex', gap: 10, marginTop: 12 }}>
@@ -300,6 +394,10 @@ function BillEditor({ draftId }) {
               <input ref={priceRef} className="form-input" type="number" inputMode="decimal" min="0" step="0.50" placeholder="0.00"
                 value={form.price} onChange={e => setForm(f => ({ ...f, price: e.target.value }))}
                 onKeyDown={e => e.key === 'Enter' && qtyRef.current?.focus()} />
+              {lastHint !== undefined && form.price !== String(lastHint) && (
+                <button className="btn btn-sm btn-ghost" style={{ marginTop: 4, padding: '2px 6px', minHeight: 0, fontSize: '0.72rem' }}
+                  onClick={() => setForm(f => ({ ...f, price: String(lastHint) }))}>Last price: ₹{lastHint}</button>
+              )}
             </div>
             <div style={{ width: 96, flexShrink: 0 }}>
               <label className="form-label">Qty</label>
@@ -338,6 +436,8 @@ function BillEditor({ draftId }) {
                 <button style={roundBtn} onClick={() => changeQty(c.key, 1)}>+</button>
               </div>
               <div style={{ fontFamily: 'JetBrains Mono, monospace', fontWeight: 700, fontSize: '0.9rem', minWidth: 72, textAlign: 'right' }}>₹{(c.price * c.qty).toFixed(2)}</div>
+              <button aria-label={`Remove ${c.name}`} title="Remove item" onClick={() => removeLine(c.key)}
+                style={{ ...roundBtn, borderColor: 'var(--danger)', color: 'var(--danger)', fontSize: '0.9rem', flexShrink: 0 }}>✕</button>
             </div>
           ))}
         </div>
@@ -387,6 +487,11 @@ function BillEditor({ draftId }) {
             🖨️ Print Bill
           </button>
         </div>
+        {draftId && (
+          <button className="btn btn-ghost btn-full" style={{ marginTop: 4, color: 'var(--danger)' }} onClick={discardDraft}>
+            🗑️ Delete this draft
+          </button>
+        )}
       </div>
     </div>
   )
@@ -396,5 +501,7 @@ function BillEditor({ draftId }) {
 // /bill and /bill/:id — React Router would otherwise reuse the old instance.
 export default function BillPage() {
   const { id } = useParams()
-  return <BillEditor key={id || 'new'} draftId={id} />
+  const [params] = useSearchParams()
+  const copy = params.get('copy')
+  return <BillEditor key={id || (copy ? 'copy-' + copy : 'new')} draftId={id} copyId={id ? null : copy} />
 }
