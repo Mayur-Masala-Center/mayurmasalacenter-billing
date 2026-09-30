@@ -12,23 +12,22 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey)
 SUPABASE SQL SCHEMA — run this in your Supabase SQL Editor
 ==========================================
 
--- Items table (products with barcodes)
+-- Items table (item names only — price is entered per bill)
 create table items (
   id uuid default gen_random_uuid() primary key,
   name text not null,
-  price numeric(10,2) not null,
-  barcode text unique not null,
   created_at timestamptz default now()
 );
+create unique index items_name_unique on items (lower(name));
 
 -- Bills table
 create table bills (
   id uuid default gen_random_uuid() primary key,
   customer_name text not null,
   total_amount numeric(10,2) default 0,
-  status text default 'pending' check (status in ('pending', 'paid')),
-  created_at timestamptz default now(),
-  paid_at timestamptz
+  status text default 'draft' check (status in ('draft', 'final')),
+  created_at timestamptz default now()
+  -- (app also uses: created_by, billing_date, discount_percent, discount_amount)
 );
 
 -- Bill items table (line items in a bill)
@@ -60,9 +59,10 @@ create policy "Auth read bills"   on bills for select using (auth.role() = 'auth
 create policy "Auth insert bills" on bills for insert with check (auth.role() = 'authenticated');
 create policy "Auth update bills" on bills for update using (auth.role() = 'authenticated');
 
--- Bill items: any authenticated user can read and insert
+-- Bill items: any authenticated user can read, insert and delete (drafts are re-saved)
 create policy "Auth read bill_items"   on bill_items for select using (auth.role() = 'authenticated');
 create policy "Auth insert bill_items" on bill_items for insert with check (auth.role() = 'authenticated');
+create policy "Auth delete bill_items" on bill_items for delete using (auth.role() = 'authenticated');
 
 ==========================================
 */
