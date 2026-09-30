@@ -161,6 +161,7 @@ body {
 .badge { display: inline-flex; align-items: center; padding: 3px 10px; border-radius: 99px; font-size: 0.72rem; font-weight: 600; letter-spacing: 0.03em; }
 .badge-draft { background: #fef3c7; color: #92400e; }
 .badge-final { background: #d1fae5; color: #065f46; }
+.badge-cancelled { background: #fee2e2; color: #991b1b; }
 
 /* ── Table ── */
 .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
