@@ -11,7 +11,10 @@ const SHOP = {
   tagline: 'Quality Masala & Pooja Items',
 }
 
-const billNo = (id) => 'MM-' + id.slice(-6).toUpperCase()
+// MM-000123 for numbered bills; old bills without a number fall back to the id suffix.
+const billNo = (bill) => bill.bill_no
+  ? 'MM-' + String(bill.bill_no).padStart(6, '0')
+  : 'MM-' + String(bill.id).slice(-6).toUpperCase()
 
 const pad = (str, len, right = false) => {
   const s = String(str).substring(0, len)
@@ -82,7 +85,7 @@ export async function onRequestGet(context) {
   const dateStr = billingDateObj.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', ...IST })
   const timeStr = new Date(bill.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', ...IST })
 
-  rows.push(text(`Bill: ${billNo(bill.id)}`, {  format: 0 }))
+  rows.push(text(`Bill: ${billNo(bill)}`, {  format: 0 }))
   rows.push(text(`Date: ${dateStr} ${timeStr}`, { format: 0 }))
   rows.push(text(`Cust: ${bill.customer_name}`, { format: 0 }))
   if (bill.created_by) {
@@ -120,9 +123,8 @@ export async function onRequestGet(context) {
   rows.push(text(`TOTAL Rs.${total.toFixed(2)}`, { bold: 1, align: 1, format: 3 }))
   rows.push(text(SOLID))
 
-  if (bill.status === 'paid') {
-    rows.push(BLANK)
-    rows.push(text('** PAID **', { bold: 1, align: 1, format: 3 }))
+  if (bill.status === 'cancelled') {
+    rows.push(text('** CANCELLED **', { bold: 1, align: 1, format: 3 }))
   }
 
   rows.push(BLANK)

@@ -25,9 +25,11 @@ create table bills (
   id uuid default gen_random_uuid() primary key,
   customer_name text not null,
   total_amount numeric(10,2) default 0,
-  status text default 'draft' check (status in ('draft', 'final')),
+  status text default 'draft' check (status in ('draft', 'final', 'cancelled')),
   created_at timestamptz default now()
-  -- (app also uses: created_by, billing_date, discount_percent, discount_amount)
+  -- (app also uses: created_by, billing_date, discount_percent, discount_amount,
+  --  cancel_reason, cancelled_at, and bill_no — a sequential number given when a bill is printed;
+  --  see supabase/migrations_part2_features.sql for the trigger that assigns it)
 );
 
 -- Bill items table (line items in a bill)
@@ -53,11 +55,14 @@ alter table bill_items enable row level security;
 create policy "Auth read items"   on items for select using (auth.role() = 'authenticated');
 create policy "Auth insert items" on items for insert with check (auth.role() = 'authenticated');
 create policy "Auth delete items" on items for delete using (auth.role() = 'authenticated');
+create policy "Auth update items" on items for update using (auth.role() = 'authenticated');
 
 -- Bills: any authenticated user can read, insert, update
 create policy "Auth read bills"   on bills for select using (auth.role() = 'authenticated');
 create policy "Auth insert bills" on bills for insert with check (auth.role() = 'authenticated');
 create policy "Auth update bills" on bills for update using (auth.role() = 'authenticated');
+-- Only DRAFTS can ever be deleted
+create policy "Auth delete draft bills" on bills for delete using (auth.role() = 'authenticated' and status = 'draft');
 
 -- Bill items: any authenticated user can read, insert and delete (drafts are re-saved)
 create policy "Auth read bill_items"   on bill_items for select using (auth.role() = 'authenticated');
