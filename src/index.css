@@ -159,8 +159,8 @@ body {
 
 /* ── Badge ── */
 .badge { display: inline-flex; align-items: center; padding: 3px 10px; border-radius: 99px; font-size: 0.72rem; font-weight: 600; letter-spacing: 0.03em; }
-.badge-pending { background: #fef3c7; color: #92400e; }
-.badge-paid    { background: #d1fae5; color: #065f46; }
+.badge-draft { background: #fef3c7; color: #92400e; }
+.badge-final { background: #d1fae5; color: #065f46; }
 
 /* ── Table ── */
 .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
@@ -186,7 +186,7 @@ tr:last-child td { border-bottom: none; }
 .empty-state-text  { font-size: 0.825rem; }
 
 /* ── Stats row ── */
-.stats-row { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 20px; }
+.stats-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 20px; }
 .stat-card { background: var(--white); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; box-shadow: var(--shadow-sm); }
 .stat-label { font-size: 0.7rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 4px; }
 .stat-value { font-size: 1.5rem; font-weight: 700; color: var(--ink); }
@@ -200,40 +200,6 @@ tr:last-child td { border-bottom: none; }
 .modal-subtitle { font-size: 0.85rem; color: var(--text-muted); margin-bottom: 20px; }
 /* Sheet handle */
 .modal::before { content: ''; display: block; width: 36px; height: 4px; background: var(--border); border-radius: 99px; margin: 0 auto 20px; }
-
-/* ── Barcode grid ── */
-.barcode-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
-.barcode-card { background: var(--white); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px 12px; text-align: center; }
-.barcode-card svg { max-width: 100%; height: auto; }
-.barcode-name  { font-weight: 600; font-size: 0.875rem; margin-top: 8px; color: var(--ink); }
-.barcode-price { font-family: 'JetBrains Mono', monospace; color: var(--teal-dark); font-weight: 600; font-size: 0.95rem; margin-top: 3px; }
-
-/* ── Scanner ── */
-.scanner-shell { min-height: 100vh; min-height: 100dvh; background: var(--ink); display: flex; flex-direction: column; }
-.scanner-nav { padding: 14px 16px; display: flex; align-items: center; justify-content: space-between; background: var(--ink-mid); flex-shrink: 0; }
-.scanner-body { flex: 1; display: flex; flex-direction: column; align-items: center; padding: 16px 16px calc(16px + var(--sab)); overflow-y: auto; }
-.scanner-title    { color: var(--white); font-size: 0.95rem; font-weight: 600; }
-.scanner-subtitle { color: rgba(255,255,255,0.45); font-size: 0.75rem; margin-top: 2px; }
-
-.video-wrapper { position: relative; width: 100%; max-width: 360px; border-radius: var(--radius); overflow: hidden; background: #000; aspect-ratio: 1; flex-shrink: 0; }
-.video-wrapper video { width: 100%; height: 100%; object-fit: cover; display: block; }
-.scan-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; }
-.scan-frame { width: 180px; height: 180px; border: 2.5px solid var(--teal); border-radius: 12px; box-shadow: 0 0 0 4000px rgba(0,0,0,0.45); position: relative; }
-.scan-line { position: absolute; left: 8px; right: 8px; height: 2px; background: var(--teal); box-shadow: 0 0 8px var(--teal); animation: scanMove 2s ease-in-out infinite; top: 10%; }
-@keyframes scanMove { 0%,100% { top: 10%; } 50% { top: 85%; } }
-
-.result-card { width: 100%; max-width: 360px; background: var(--ink-mid); border-radius: var(--radius); padding: 20px 16px; border: 1.5px solid rgba(255,255,255,0.08); text-align: center; }
-.result-item-name  { color: var(--white); font-size: 1.1rem; font-weight: 700; }
-.result-item-price { color: var(--teal); font-size: 1.4rem; font-weight: 700; font-family: 'JetBrains Mono', monospace; margin-top: 6px; }
-.result-barcode    { color: rgba(255,255,255,0.35); font-size: 0.7rem; font-family: 'JetBrains Mono', monospace; margin-top: 4px; }
-
-.scan-actions { display: flex; gap: 10px; width: 100%; max-width: 360px; }
-
-.scanner-cart { width: 100%; max-width: 360px; margin-top: 12px; }
-.cart-item-row { display: flex; justify-content: space-between; align-items: center; padding: 9px 12px; background: rgba(255,255,255,0.05); border-radius: var(--radius-sm); margin-bottom: 5px; color: var(--white); font-size: 0.825rem; }
-.cart-item-name  { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-right: 8px; }
-.cart-item-qty   { color: var(--teal); font-weight: 600; width: 36px; text-align: center; font-family: 'JetBrains Mono', monospace; flex-shrink: 0; }
-.cart-item-price { font-family: 'JetBrains Mono', monospace; color: rgba(255,255,255,0.75); flex-shrink: 0; }
 
 /* ── Utils ── */
 .divider { height: 1px; background: var(--border); margin: 16px 0; }
@@ -250,20 +216,15 @@ tr:last-child td { border-bottom: none; }
 /* ── Print ── */
 @media print {
   .nav, .btn, .no-print { display: none !important; }
-  .barcode-grid { grid-template-columns: repeat(3, 1fr) !important; gap: 8px !important; }
-  .barcode-card { break-inside: avoid; border: 1px solid #ccc; }
   body { background: white; }
 }
 
 /* ── Responsive: wider screens get more columns ── */
 @media (min-width: 480px) {
-  .barcode-grid { grid-template-columns: repeat(3, 1fr); }
-  .stats-row    { grid-template-columns: repeat(4, 1fr); }
 }
 @media (min-width: 768px) {
   .page, .page-wide { padding: 28px 24px; }
   .page-title { font-size: 1.75rem; }
-  .barcode-grid { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); }
   .modal-overlay { align-items: center; padding: 16px; }
   .modal { border-radius: var(--radius-lg); max-height: 85vh; }
   @keyframes sheetUp { from { opacity: 0; transform: scale(0.96); } to { opacity: 1; transform: scale(1); } }
