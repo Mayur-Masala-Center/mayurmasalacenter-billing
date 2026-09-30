@@ -30,11 +30,10 @@ const roundBtn = {
 }
 
 // Steps: 'start' | 'bill'
-export default function BillPage() {
+function BillEditor({ draftId }) {
   const toast    = useToast()
   const navigate = useNavigate()
   const { user } = useAuth()
-  const { id: draftId } = useParams()
 
   const [step, setStep]                 = useState(draftId ? 'bill' : 'start')
   const [loadingDraft, setLoadingDraft] = useState(!!draftId)
@@ -45,6 +44,8 @@ export default function BillPage() {
   const [saving, setSaving]             = useState(false)
   const [catalog, setCatalog]           = useState([])
   const [form, setForm]                 = useState({ name: '', price: '', qty: 1 })
+  const [printPending, setPrintPending] = useState(null)
+  const savingRef = useRef(false)
   const priceRef = useRef(null)
 
   // ── Item catalog (names only) for suggestions ──
@@ -172,10 +173,17 @@ export default function BillPage() {
     return bill
   }
 
+  // Leave the editor after a save. Slight delay so nothing touches the
+  // page/history in the same instant the printer deep link is launched.
+  const finish = () => setTimeout(() => {
+    if (draftId) navigate('/bill', { replace: true }); else resetBill()
+  }, 300)
+
   const handleSaveDraft = async () => {
-    setSaving(true)
+    if (savingRef.current) return
+    savingRef.current = true; setSaving(true)
     const bill = await saveBill('draft')
-    setSaving(false)
+    savingRef.current = false; setSaving(false)
     if (!bill) return
     unsavedRef.current = false
     toast(`Draft saved for ${customerName.trim()}`)
@@ -183,14 +191,25 @@ export default function BillPage() {
   }
 
   const handlePrint = async () => {
-    setSaving(true)
+    if (savingRef.current) return
+    savingRef.current = true; setSaving(true)
     const bill = await saveBill('final')
-    setSaving(false)
+    savingRef.current = false; setSaving(false)
     if (!bill) return
     unsavedRef.current = false
+    // Browsers only let a page open another app (the printer app) shortly after
+    // a tap. If the save was slow enough for that tap to expire, ask for one
+    // more tap instead of silently failing to print.
+    if (navigator.userActivation && !navigator.userActivation.isActive) {
+      setPrintPending(bill)
+      return
+    }
     bluetoothPrint(bill)
-    if (draftId) navigate('/bill', { replace: true }); else resetBill()
+    finish()
   }
+
+  const printNow = () => { const bill = printPending; setPrintPending(null); bluetoothPrint(bill); finish() }
+  const skipPrint = () => { setPrintPending(null); finish() }
 
   // ─── Step: Start ───────────────────────────────────
   if (step === 'start') {
@@ -338,6 +357,18 @@ export default function BillPage() {
           </div>
         )}
 
+        {printPending && (
+          <div className="modal-overlay">
+            <div className="modal" style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: '2rem' }}>✅</div>
+              <div className="modal-title">Bill saved</div>
+              <div className="modal-subtitle">Tap to send it to the printer.</div>
+              <button className="btn btn-primary btn-full btn-lg" onClick={printNow}>🖨️ Print now</button>
+              <button className="btn btn-ghost btn-full" style={{ marginTop: 8 }} onClick={skipPrint}>Skip</button>
+            </div>
+          </div>
+        )}
+
         {/* The two actions */}
         <div style={{ display: 'flex', gap: 10, marginTop: 16, paddingBottom: 'calc(16px + var(--sab, 0px))' }}>
           <button className="btn btn-secondary btn-full btn-lg" disabled={!canSave} onClick={handleSaveDraft}>
@@ -350,4 +381,11 @@ export default function BillPage() {
       </div>
     </div>
   )
+}
+
+// `key` forces a fresh editor (clean state) whenever we move between
+// /bill and /bill/:id — React Router would otherwise reuse the old instance.
+export default function BillPage() {
+  const { id } = useParams()
+  return <BillEditor key={id || 'new'} draftId={id} />
 }
