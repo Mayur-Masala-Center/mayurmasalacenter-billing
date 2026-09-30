@@ -43,10 +43,12 @@ function BillEditor({ draftId }) {
   const [discountPct, setDiscountPct]   = useState(0)
   const [saving, setSaving]             = useState(false)
   const [catalog, setCatalog]           = useState([])
-  const [form, setForm]                 = useState({ name: '', price: '', qty: 1 })
+  const [form, setForm]                 = useState({ name: '', price: '', qty: '' })
   const [printPending, setPrintPending] = useState(null)
   const savingRef = useRef(false)
+  const nameRef  = useRef(null)
   const priceRef = useRef(null)
+  const qtyRef   = useRef(null)
 
   // ── Item catalog (names only) for suggestions ──
   useEffect(() => {
@@ -119,11 +121,14 @@ function BillEditor({ draftId }) {
     const price = parseFloat(form.price)
     if (!name) return toast('Enter item name', 'error')
     if (isNaN(price) || price <= 0) return toast('Enter a valid price', 'error')
+    const qty = parseInt(form.qty, 10)
+    if (isNaN(qty) || qty < 1) return toast('Enter quantity', 'error')
     const key = lineKey(name, price)
     setCart(prev => prev.some(c => c.key === key)
-      ? prev.map(c => c.key === key ? { ...c, qty: c.qty + form.qty } : c)
-      : [...prev, { key, name, price, qty: form.qty }])
-    setForm({ name: '', price: '', qty: 1 })
+      ? prev.map(c => c.key === key ? { ...c, qty: c.qty + qty } : c)
+      : [...prev, { key, name, price, qty }])
+    setForm({ name: '', price: '', qty: '' })
+    nameRef.current?.focus()   // ready for the next item
   }
 
   const changeQty = (key, delta) => setCart(prev =>
@@ -131,7 +136,7 @@ function BillEditor({ draftId }) {
 
   const resetBill = () => {
     setStep('start'); setCustomerName(''); setBillingDate(todayIST())
-    setCart([]); setDiscountPct(0); setForm({ name: '', price: '', qty: 1 })
+    setCart([]); setDiscountPct(0); setForm({ name: '', price: '', qty: '' })
   }
 
   // ── Save (draft or final) ──
@@ -278,7 +283,7 @@ function BillEditor({ draftId }) {
         {/* Add item */}
         <div className="card" style={{ padding: 14, marginBottom: 12 }}>
           <label className="form-label">Item Name</label>
-          <input className="form-input" placeholder="Type or pick an item" value={form.name} autoFocus
+          <input ref={nameRef} className="form-input" placeholder="Type or pick an item" value={form.name} autoFocus
             onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
             onKeyDown={e => e.key === 'Enter' && priceRef.current?.focus()} />
           {suggestions.length > 0 && (
@@ -294,15 +299,19 @@ function BillEditor({ draftId }) {
               <label className="form-label">Price (₹)</label>
               <input ref={priceRef} className="form-input" type="number" inputMode="decimal" min="0" step="0.50" placeholder="0.00"
                 value={form.price} onChange={e => setForm(f => ({ ...f, price: e.target.value }))}
-                onKeyDown={e => e.key === 'Enter' && addItem()} />
+                onKeyDown={e => e.key === 'Enter' && qtyRef.current?.focus()} />
             </div>
             <div style={{ width: 96, flexShrink: 0 }}>
               <label className="form-label">Qty</label>
               <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-                <button className="btn btn-secondary btn-sm" style={{ width: 26, padding: 0 }} onClick={() => setForm(f => ({ ...f, qty: Math.max(1, f.qty - 1) }))}>−</button>
-                <input className="form-input" type="number" min="1" value={form.qty} style={{ padding: '8px 2px', textAlign: 'center' }}
-                  onChange={e => setForm(f => ({ ...f, qty: Math.max(1, parseInt(e.target.value) || 1) }))} />
-                <button className="btn btn-secondary btn-sm" style={{ width: 26, padding: 0 }} onClick={() => setForm(f => ({ ...f, qty: f.qty + 1 }))}>+</button>
+                <button className="btn btn-secondary btn-sm" style={{ width: 26, padding: 0 }}
+                  onClick={() => setForm(f => { const n = (parseInt(f.qty, 10) || 0) - 1; return { ...f, qty: n < 1 ? '' : String(n) } })}>−</button>
+                <input ref={qtyRef} className="form-input" type="text" inputMode="numeric" pattern="[0-9]*" placeholder="Qty"
+                  value={form.qty} style={{ padding: '8px 2px', textAlign: 'center' }}
+                  onChange={e => setForm(f => ({ ...f, qty: e.target.value.replace(/\D/g, '') }))}
+                  onKeyDown={e => e.key === 'Enter' && addItem()} />
+                <button className="btn btn-secondary btn-sm" style={{ width: 26, padding: 0 }}
+                  onClick={() => setForm(f => ({ ...f, qty: String((parseInt(f.qty, 10) || 0) + 1) }))}>+</button>
               </div>
             </div>
           </div>
