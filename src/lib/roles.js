@@ -1,5 +1,5 @@
 // ── Access control ────────────────────────────────────────────────
-// Add email addresses here to grant dashboard + mark-as-paid access
+// Add email addresses here to grant dashboard access
 export const OWNER_EMAILS = [
   'wanisanjay619@gmail.com',
   'prasadbhavsar7777@gmail.com',
