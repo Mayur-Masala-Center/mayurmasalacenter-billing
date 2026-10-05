@@ -3,11 +3,26 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/AuthContext'
 import { isOwner } from '../lib/roles'
+import { todayIST, billDay } from '../lib/billUtils'
 
 export default function HomePage() {
   const navigate = useNavigate()
   const { user } = useAuth()
   const [stats, setStats] = useState({ items: 0, bills: 0, drafts: 0 })
+  const owner = isOwner(user?.email)
+  const [today, setToday] = useState(null)      // owner only: { sales, count }
+
+  // Today's printed bills (a bill belongs to its billing date, so backdated ones don't count)
+  useEffect(() => {
+    if (!owner) return
+    const day = todayIST()
+    supabase.from('bills').select('total_amount, billing_date, created_at').eq('status', 'final')
+      .gte('created_at', day + 'T00:00:00+05:30')
+      .then(({ data }) => {
+        const mine = (data || []).filter(b => billDay(b) === day)
+        setToday({ sales: mine.reduce((t, b) => t + Number(b.total_amount), 0), count: mine.length })
+      })
+  }, [owner])
 
   useEffect(() => {
     Promise.all([
@@ -45,6 +60,14 @@ export default function HomePage() {
         </p>
       </div>
 
+      {owner && today && (
+        <div style={{ background: 'var(--ink)', color: 'var(--white)', borderRadius: 'var(--radius)', padding: '16px 28px', marginBottom: 20, minWidth: 260 }}>
+          <div style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Today's sales</div>
+          <div style={{ color: 'var(--teal)', fontSize: '2rem', fontWeight: 700, fontFamily: 'JetBrains Mono, monospace' }}>₹{today.sales.toFixed(0)}</div>
+          <div style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.5)' }}>{today.count} printed bill{today.count === 1 ? '' : 's'}</div>
+        </div>
+      )}
+
       {/* Quick stats */}
       <div style={{ display: 'flex', gap: '16px', marginBottom: '40px', flexWrap: 'wrap', justifyContent: 'center' }}>
         {[
@@ -73,7 +96,7 @@ export default function HomePage() {
         <button className="btn btn-primary btn-full btn-lg" onClick={() => navigate('/bill')}>
           🧾 Start New Bill
         </button>
-        {isOwner(user?.email) && (
+        {owner && (
           <button className="btn btn-dark btn-full btn-lg" onClick={() => navigate('/dashboard')}>
             📊 Billing Dashboard
           </button>

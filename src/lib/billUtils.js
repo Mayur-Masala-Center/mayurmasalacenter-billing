@@ -33,6 +33,24 @@ export function matchesSearch(bill, query) {
   return (bill.customer_name || '').toLowerCase().includes(q) || billNo(bill).toLowerCase().includes(q)
 }
 
+// How a bill's numbers add up:  subtotal - discount (+/- round-off) = total.
+// The round-off is not stored: it is whatever is left between the line items and the saved total
+// (always under 50 paise). Old percent-discount bills keep showing their percent.
+const r2 = n => Math.round(n * 100) / 100
+export function billTotals(bill, items) {
+  const total = Number(bill.total_amount)
+  const discount = Number(bill.discount_amount || 0)
+  const pct = Number(bill.discount_percent || 0)
+  const fromItems = items && items.length
+    ? r2(items.reduce((t, l) => t + Number(l.item_price) * Number(l.quantity), 0))
+    : r2(total + discount)
+  const diff = r2(total - (fromItems - discount))
+  const isRoundOff = Math.abs(diff) >= 0.005 && Math.abs(diff) <= 0.5
+  const subtotal = isRoundOff || Math.abs(diff) < 0.005 ? fromItems : r2(total + discount)   // odd legacy data: keep old maths
+  return { subtotal, discount, pct, roundOff: isRoundOff ? diff : 0, total,
+           discountLabel: pct > 0 ? `Discount (${pct}%)` : 'Discount' }
+}
+
 // ── CSV (opens directly in Excel / Google Sheets) ──────────────────
 function cell(v) {
   let s = v === null || v === undefined ? '' : String(v)

@@ -115,9 +115,18 @@ export async function onRequestGet(context) {
   const discAmt = Number(bill.discount_amount  || 0)
   const total   = Number(bill.total_amount)
 
+  // Round-off isn't stored: it's the (sub-rupee) gap between the items and the saved total.
+  const diff     = Math.round((total - (subtotal - discAmt)) * 100) / 100
+  const roundOff = Math.abs(diff) >= 0.005 && Math.abs(diff) <= 0.5 ? diff : 0
+
   rows.push(text(`Subtotal: Rs.${subtotal.toFixed(2)}`, { align: 2, format: 0 }))
   if (discPct > 0) {
     rows.push(text(`Disc(${discPct}%): -Rs.${discAmt.toFixed(2)}`, { align: 2, format: 0 }))
+  } else if (discAmt > 0) {
+    rows.push(text(`Discount: -Rs.${discAmt.toFixed(2)}`, { align: 2, format: 0 }))
+  }
+  if (roundOff !== 0) {
+    rows.push(text(`Round off: ${roundOff > 0 ? '+' : '-'}Rs.${Math.abs(roundOff).toFixed(2)}`, { align: 2, format: 0 }))
   }
   rows.push(text(SOLID))
   rows.push(text(`TOTAL Rs.${total.toFixed(2)}`, { bold: 1, align: 1, format: 3 }))

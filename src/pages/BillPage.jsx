@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 import { useToast } from '../components/Toast'
 import { useAuth } from '../lib/AuthContext'
 import { bluetoothPrint } from '../lib/print'
+import { billNo } from '../lib/billUtils'
 
 // ── Today's date (Asia/Kolkata) as YYYY-MM-DD ──────────────────────
 // Defaults the billing-date picker and caps it so a bill can't be
@@ -17,6 +18,25 @@ function todayIST() {
 }
 
 const round2 = n => Math.round(n * 100) / 100
+
+// Was this saved bill rounded off? (the round-off isn't stored: it's the sub-rupee gap between items and total)
+function roundedInSaved(bill, lines) {
+  const sum = (lines || []).reduce((t, l) => t + Number(l.item_price) * Number(l.quantity), 0)
+  const diff = round2(Number(bill.total_amount) - (sum - Number(bill.discount_amount || 0)))
+  return Math.abs(diff) >= 0.005 && Math.abs(diff) <= 0.5
+}
+
+// ── "Resume unfinished bill": the bill being built is kept in this phone's browser storage ──
+const PROGRESS_MAX_AGE = 24 * 60 * 60 * 1000
+function readProgress(key) {
+  try {
+    const r = JSON.parse(localStorage.getItem(key))
+    if (r && Array.isArray(r.cart) && r.cart.length && Date.now() - r.savedAt < PROGRESS_MAX_AGE) return r
+  } catch { /* storage unavailable or corrupt: just don't resume */ }
+  return null
+}
+function clearProgress(key) { try { localStorage.removeItem(key) } catch { /* ignore */ } }
+const ROUND_PREF = 'mm_round_off'
 // Same name + same price = same line; same name at a new price = new line.
 const lineKey = (name, price) => `${name.toLowerCase().trim()}|${price}`
 
@@ -34,13 +54,21 @@ function BillEditor({ draftId, copyId }) {
   const toast    = useToast()
   const navigate = useNavigate()
   const { user } = useAuth()
+  const progressKey = `mm_bill_progress:${user?.email || 'anon'}`
+  const isNew = !draftId && !copyId
 
   const [step, setStep]                 = useState(draftId || copyId ? 'bill' : 'start')
   const [loadingDraft, setLoadingDraft] = useState(!!(draftId || copyId))
   const [customerName, setCustomerName] = useState('')
   const [billingDate, setBillingDate]   = useState(todayIST())
   const [cart, setCart]                 = useState([])
-  const [discountPct, setDiscountPct]   = useState(0)
+  const [discount, setDiscount]         = useState(0)            // rupees
+  const [roundOff, setRoundOff]         = useState(() => { try { return localStorage.getItem(ROUND_PREF) === '1' } catch { return false } })
+  const [editing, setEditing]           = useState(null)         // cart line being edited: { key, price, qty }
+  const [undo, setUndo]                 = useState(null)         // recently removed lines: { items: [{ line, index }] }
+  const [resumable, setResumable]       = useState(() => (isNew ? readProgress(progressKey) : null))
+  const [lastBill, setLastBill]         = useState(null)         // this person's last printed bill (for reprint)
+  const undoTimer = useRef(null)
   const [saving, setSaving]             = useState(false)
   const [catalog, setCatalog]           = useState([])
   const [history, setHistory]           = useState({ last: {}, names: [], top: [] })
@@ -95,7 +123,8 @@ function BillEditor({ draftId, copyId }) {
       const { data: lines } = await supabase.from('bill_items').select('*').eq('bill_id', draftId)
       setCustomerName(bill.customer_name)
       if (bill.billing_date) setBillingDate(bill.billing_date)
-      setDiscountPct(Number(bill.discount_percent || 0))
+      setDiscount(Number(bill.discount_amount || 0))
+      setRoundOff(roundedInSaved(bill, lines))
       setCart((lines || []).map(l => ({
         key: lineKey(l.item_name, Number(l.item_price)),
         name: l.item_name, price: Number(l.item_price), qty: l.quantity,
@@ -116,7 +145,8 @@ function BillEditor({ draftId, copyId }) {
       }
       const { data: lines } = await supabase.from('bill_items').select('*').eq('bill_id', copyId)
       setCustomerName(bill.customer_name)
-      setDiscountPct(Number(bill.discount_percent || 0))
+      setDiscount(Number(bill.discount_amount || 0))
+      setRoundOff(roundedInSaved(bill, lines))
       setCart((lines || []).map(l => ({
         key: lineKey(l.item_name, Number(l.item_price)),
         name: l.item_name, price: Number(l.item_price), qty: l.quantity,
@@ -136,13 +166,13 @@ function BillEditor({ draftId, copyId }) {
     window.history.pushState({ billGuard: true }, '')
     const onPop = () => {
       if (unsavedRef.current) {
-        if (window.confirm('Discard this bill? Unsaved items will be lost.')) navigate('/')
+        if (window.confirm('Discard this bill? Unsaved items will be lost.')) { clearProgress(progressKey); navigate('/') }
         else window.history.pushState({ billGuard: true }, '')
       } else navigate('/')
     }
     window.addEventListener('popstate', onPop)
     return () => window.removeEventListener('popstate', onPop)
-  }, [navigate])
+  }, [navigate, progressKey])
 
   useEffect(() => {
     const onUnload = e => { if (unsavedRef.current) { e.preventDefault(); e.returnValue = '' } }
@@ -150,10 +180,28 @@ function BillEditor({ draftId, copyId }) {
     return () => window.removeEventListener('beforeunload', onUnload)
   }, [])
 
+  // Keep the bill being built so a dead phone / refresh / Back doesn't lose it
+  useEffect(() => {
+    if (!isNew || step !== 'bill' || cart.length === 0) return
+    try { localStorage.setItem(progressKey, JSON.stringify({ customerName, billingDate, cart, discount, roundOff, savedAt: Date.now() })) } catch { /* ignore */ }
+  }, [isNew, step, customerName, billingDate, cart, discount, roundOff, progressKey])
+
+  // This person's most recent printed bill, so a jammed printer can be retried from the start screen
+  useEffect(() => {
+    if (!isNew || step !== 'start' || !user?.email) return
+    supabase.from('bills').select('*').eq('created_by', user.email).eq('status', 'final')
+      .order('created_at', { ascending: false }).limit(1)
+      .then(({ data }) => setLastBill(data?.[0] ?? null))
+  }, [isNew, step, user?.email])
+
+  useEffect(() => () => clearTimeout(undoTimer.current), [])
+
   // ── Totals ──
   const subtotal    = useMemo(() => cart.reduce((s, c) => s + c.price * c.qty, 0), [cart])
-  const discountAmt = round2((subtotal * discountPct) / 100)
-  const total       = round2(subtotal - discountAmt)
+  const discountAmt = round2(Math.min(Math.max(discount, 0), subtotal))      // rupees off, never more than the bill
+  const net         = round2(subtotal - discountAmt)
+  const total       = roundOff ? Math.round(net) : net                         // optional round-off to the nearest rupee
+  const roundDiff   = round2(total - net)
   const cartCount   = cart.reduce((s, c) => s + c.qty, 0)
 
   // ── Cart actions ──
@@ -174,13 +222,13 @@ function BillEditor({ draftId, copyId }) {
 
   const lastHint = history.last[form.name.trim().toLowerCase()]   // price used last time, if known
 
-  // Choose an item name: fix its capitalisation, pre-fill the last price used, jump to the next field.
+  // Choose an item name: fix its capitalisation and jump to the next field.
+  // The price is never filled in automatically — the "Last price" hint is there if you want it.
   const pickName = (raw) => {
     const typed = raw.trim()
     const name = allNames.find(n => n.toLowerCase() === typed.toLowerCase()) ?? typed
-    const p = history.last[name.toLowerCase()]
-    setForm(f => ({ ...f, name, price: f.price === '' && p !== undefined ? String(p) : f.price }))
-    ;(p !== undefined || form.price !== '' ? qtyRef : priceRef).current?.focus()
+    setForm(f => ({ ...f, name }))
+    ;(form.price !== '' ? qtyRef : priceRef).current?.focus()
   }
 
   const addItem = () => {
@@ -198,14 +246,62 @@ function BillEditor({ draftId, copyId }) {
     nameRef.current?.focus()   // ready for the next item
   }
 
-  const changeQty = (key, delta) => setCart(prev =>
-    prev.flatMap(c => c.key !== key ? [c] : (c.qty + delta <= 0 ? [] : [{ ...c, qty: c.qty + delta }])))
+  // Remove a line, with a few seconds to undo it
+  const removeLine = key => {
+    const index = cart.findIndex(c => c.key === key)
+    if (index < 0) return
+    const line = cart[index]
+    setCart(prev => prev.filter(c => c.key !== key))
+    setEditing(e => (e?.key === key ? null : e))
+    setUndo(u => ({ items: [...(u?.items || []), { line, index }] }))
+    clearTimeout(undoTimer.current)
+    undoTimer.current = setTimeout(() => setUndo(null), 6000)
+  }
 
-  const removeLine = key => setCart(prev => prev.filter(c => c.key !== key))
+  const undoRemove = () => {
+    if (!undo) return
+    setCart(prev => {
+      const next = [...prev]
+      for (const { line, index } of [...undo.items].reverse()) {
+        const same = next.find(c => c.key === line.key)
+        if (same) same.qty += line.qty                       // an identical line was added meanwhile: merge
+        else next.splice(Math.min(index, next.length), 0, { ...line })
+      }
+      return next
+    })
+    clearTimeout(undoTimer.current); setUndo(null)
+  }
+
+  const changeQty = (key, delta) => {
+    const c = cart.find(x => x.key === key)
+    if (!c) return
+    if (c.qty + delta <= 0) return removeLine(key)
+    setCart(prev => prev.map(x => (x.key === key ? { ...x, qty: x.qty + delta } : x)))
+  }
+
+  // Tap a line to correct its price or quantity
+  const startEdit = c => setEditing({ key: c.key, price: String(c.price), qty: String(c.qty) })
+  const saveEdit = () => {
+    const price = parseFloat(editing.price), qty = parseInt(editing.qty, 10)
+    if (isNaN(price) || price <= 0) return toast('Enter a valid price', 'error')
+    if (isNaN(qty) || qty < 1) return toast('Enter quantity', 'error')
+    const oldKey = editing.key
+    const target = cart.find(c => c.key === oldKey)
+    if (!target) return setEditing(null)
+    const newKey = lineKey(target.name, price)
+    setCart(prev => {
+      const clash = newKey !== oldKey && prev.find(c => c.key === newKey)
+      if (clash) return prev.filter(c => c.key !== oldKey).map(c => (c.key === newKey ? { ...c, qty: c.qty + qty } : c))   // now identical to another line: merge
+      return prev.map(c => (c.key === oldKey ? { ...c, key: newKey, price, qty } : c))
+    })
+    setEditing(null)
+  }
+
+  const toggleRound = on => { setRoundOff(on); try { localStorage.setItem(ROUND_PREF, on ? '1' : '0') } catch { /* ignore */ } }
 
   const resetBill = () => {
     setStep('start'); setCustomerName(''); setBillingDate(todayIST())
-    setCart([]); setDiscountPct(0); setForm({ name: '', price: '', qty: '' })
+    setCart([]); setDiscount(0); setEditing(null); setUndo(null); setForm({ name: '', price: '', qty: '' })
   }
 
   // ── Save (draft or final) ──
@@ -217,7 +313,7 @@ function BillEditor({ draftId, copyId }) {
 
     const fields = {
       customer_name: customerName.trim(), total_amount: total,
-      discount_percent: discountPct, discount_amount: discountAmt,
+      discount_percent: 0, discount_amount: discountAmt,
       status, billing_date: billingDate,
     }
     let bill
@@ -259,6 +355,7 @@ function BillEditor({ draftId, copyId }) {
     savingRef.current = false; setSaving(false)
     if (!bill) return
     unsavedRef.current = false
+    clearProgress(progressKey)
     toast(`Draft saved for ${customerName.trim()}`)
     leave()
   }
@@ -270,6 +367,7 @@ function BillEditor({ draftId, copyId }) {
     savingRef.current = false; setSaving(false)
     if (!bill) return
     unsavedRef.current = false
+    clearProgress(progressKey)
     // Browsers only let a page open another app (the printer app) shortly after
     // a tap. If the save was slow enough for that tap to expire, ask for one
     // more tap instead of silently failing to print.
@@ -293,6 +391,14 @@ function BillEditor({ draftId, copyId }) {
   const printNow = () => { const bill = printPending; setPrintPending(null); bluetoothPrint(bill); finish() }
   const skipPrint = () => { setPrintPending(null); finish() }
 
+  const resumeProgress = () => {
+    const r = resumable
+    setCustomerName(r.customerName || ''); setBillingDate(r.billingDate || todayIST())
+    setCart(r.cart); setDiscount(Number(r.discount || 0)); setRoundOff(!!r.roundOff)
+    setResumable(null); setStep('bill')
+  }
+  const discardProgress = () => { clearProgress(progressKey); setResumable(null) }
+
   // ─── Step: Start ───────────────────────────────────
   if (step === 'start') {
     return (
@@ -303,6 +409,18 @@ function BillEditor({ draftId, copyId }) {
           <p style={{ color: 'rgba(255,255,255,0.5)', marginTop: 6, fontSize: '0.9rem' }}>Enter customer name to start billing</p>
         </div>
         <div style={{ width: '100%', maxWidth: 360 }}>
+          {resumable && (
+            <div style={{ background: 'rgba(0,201,167,0.12)', border: '1px solid var(--teal)', borderRadius: 'var(--radius)', padding: 12, marginBottom: 18 }}>
+              <div style={{ color: 'var(--white)', fontWeight: 700, fontSize: '0.9rem' }}>Unfinished bill for {resumable.customerName}</div>
+              <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.78rem', marginTop: 2 }}>
+                {resumable.cart.length} item{resumable.cart.length === 1 ? '' : 's'} · saved {new Date(resumable.savedAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+              </div>
+              <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+                <button className="btn btn-primary btn-sm btn-full" onClick={resumeProgress}>↩️ Resume</button>
+                <button className="btn btn-sm" style={{ color: 'rgba(255,255,255,0.6)', border: '1px solid rgba(255,255,255,0.2)', background: 'none' }} onClick={discardProgress}>Discard</button>
+              </div>
+            </div>
+          )}
           <div className="form-group">
             <label className="form-label" style={{ color: 'rgba(255,255,255,0.5)' }}>Customer Name</label>
             <input className="form-input" style={darkInput} placeholder="e.g. Ravi Kumar"
@@ -336,6 +454,12 @@ function BillEditor({ draftId, copyId }) {
             disabled={!customerName.trim() || !billingDate} onClick={() => setStep('bill')}>
             Start Billing →
           </button>
+          {lastBill && (
+            <button className="btn btn-ghost btn-full" style={{ marginTop: 10, color: 'rgba(255,255,255,0.7)', borderColor: 'rgba(255,255,255,0.2)' }}
+              title="Send your last printed bill to the printer again" onClick={() => bluetoothPrint(lastBill)}>
+              🖨️ Reprint last bill · {billNo(lastBill)} · {lastBill.customer_name} · ₹{Number(lastBill.total_amount).toFixed(0)}
+            </button>
+          )}
           <button className="btn btn-ghost btn-full" style={{ marginTop: 10, color: 'rgba(255,255,255,0.4)', borderColor: 'rgba(255,255,255,0.1)' }}
             onClick={() => navigate('/')}>
             ← Back to Home
@@ -424,10 +548,34 @@ function BillEditor({ draftId, copyId }) {
               <div className="empty-state-title">No items yet</div>
               <div className="empty-state-text">Add items above</div>
             </div>
-          ) : cart.map((c, i) => (
+          ) : cart.map((c, i) => editing?.key === c.key ? (
+            <div key={c.key} style={{ padding: '12px 14px', borderBottom: i < cart.length - 1 ? '1px solid var(--border)' : 'none', background: 'var(--paper)' }}>
+              <div style={{ fontWeight: 600, fontSize: '0.9rem', marginBottom: 8 }}>{c.name}</div>
+              <div style={{ display: 'flex', gap: 10 }}>
+                <div style={{ flex: 1 }}>
+                  <label className="form-label">Price (₹)</label>
+                  <input aria-label="Edit price" className="form-input" type="number" inputMode="decimal" min="0" step="0.50" autoFocus
+                    value={editing.price} onChange={e => setEditing(x => ({ ...x, price: e.target.value }))}
+                    onKeyDown={e => e.key === 'Enter' && saveEdit()} />
+                </div>
+                <div style={{ width: 96 }}>
+                  <label className="form-label">Qty</label>
+                  <input aria-label="Edit quantity" className="form-input" type="text" inputMode="numeric" pattern="[0-9]*"
+                    value={editing.qty} style={{ textAlign: 'center' }}
+                    onChange={e => setEditing(x => ({ ...x, qty: e.target.value.replace(/\D/g, '') }))}
+                    onKeyDown={e => e.key === 'Enter' && saveEdit()} />
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+                <button className="btn btn-secondary btn-sm" onClick={() => setEditing(null)}>Cancel</button>
+                <button className="btn btn-primary btn-sm btn-full" onClick={saveEdit}>✓ Save changes</button>
+              </div>
+            </div>
+          ) : (
             <div key={c.key} style={{ display: 'flex', alignItems: 'center', padding: '12px 14px', borderBottom: i < cart.length - 1 ? '1px solid var(--border)' : 'none', gap: 8 }}>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontWeight: 600, fontSize: '0.9rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</div>
+              <div style={{ flex: 1, minWidth: 0, cursor: 'pointer' }} role="button" tabIndex={0} title="Tap to edit price or quantity"
+                onClick={() => startEdit(c)} onKeyDown={e => e.key === 'Enter' && startEdit(c)}>
+                <div style={{ fontWeight: 600, fontSize: '0.9rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name} <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>✏️</span></div>
                 <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontFamily: 'JetBrains Mono, monospace', marginTop: 2 }}>₹{c.price.toFixed(2)} each</div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -442,6 +590,16 @@ function BillEditor({ draftId, copyId }) {
           ))}
         </div>
 
+        {undo && (
+          <div role="status" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--ink)', color: 'var(--white)', borderRadius: 'var(--radius-sm)', padding: '10px 14px', marginTop: 8, fontSize: '0.85rem' }}>
+            <span>Removed {undo.items.length === 1 ? `“${undo.items[0].line.name}”` : `${undo.items.length} items`}</span>
+            <button onClick={undoRemove} style={{ background: 'none', border: 'none', color: 'var(--teal)', fontWeight: 700, cursor: 'pointer', fontSize: '0.9rem' }}>↩ Undo</button>
+          </div>
+        )}
+        {cart.length > 0 && !undo && (
+          <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textAlign: 'center', marginTop: 6 }}>Tap an item to change its price or quantity</div>
+        )}
+
         {/* Discount + totals */}
         {cart.length > 0 && (
           <div className="card" style={{ padding: '12px 14px', marginTop: 12 }}>
@@ -450,14 +608,22 @@ function BillEditor({ draftId, copyId }) {
               <span className="font-mono">₹{subtotal.toFixed(2)}</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, margin: '10px 0' }}>
-              <label className="form-label" style={{ margin: 0 }}>Discount %</label>
-              <input className="form-input" type="number" inputMode="decimal" min="0" max="100" step="0.5"
-                value={discountPct || ''} placeholder="0" style={{ width: 90, textAlign: 'center' }}
-                onChange={e => setDiscountPct(Math.min(100, Math.max(0, parseFloat(e.target.value) || 0)))} />
+              <label className="form-label" style={{ margin: 0 }}>Discount (₹)</label>
+              <input className="form-input" type="number" inputMode="decimal" min="0" step="1" aria-label="Discount in rupees"
+                value={discount || ''} placeholder="0" style={{ width: 110, textAlign: 'center' }}
+                onChange={e => setDiscount(Math.max(0, parseFloat(e.target.value) || 0))} />
             </div>
-            {discountPct > 0 && (
+            {discountAmt > 0 && (
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.875rem', color: 'var(--danger)', marginBottom: 8 }}>
-                <span>Discount ({discountPct}%)</span><span className="font-mono">− ₹{discountAmt.toFixed(2)}</span>
+                <span>Discount</span><span className="font-mono">− ₹{discountAmt.toFixed(2)}</span>
+              </div>
+            )}
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.85rem', margin: '4px 0 8px', cursor: 'pointer' }}>
+              <input type="checkbox" checked={roundOff} onChange={e => toggleRound(e.target.checked)} /> Round off to nearest ₹
+            </label>
+            {roundOff && roundDiff !== 0 && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.875rem', color: 'var(--text-muted)', marginBottom: 8 }}>
+                <span>Round off</span><span className="font-mono">{roundDiff > 0 ? '+' : '−'} ₹{Math.abs(roundDiff).toFixed(2)}</span>
               </div>
             )}
             <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, borderTop: '1px solid var(--border)', paddingTop: 8 }}>

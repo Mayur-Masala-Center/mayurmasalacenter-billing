@@ -6,12 +6,15 @@ A fast, mobile-friendly manual billing app with Supabase Auth login.
 
 - 🔐 **Login / Sign Up / Forgot Password** via Supabase Auth
 - 📦 **Item catalog** — save item names once (rename or delete any time)
-- ✏️ **Manual billing** — type or pick an item, enter price and qty; one-tap ✕ removes a line
+- ✏️ **Manual billing** — type or pick an item, enter price and qty. Tap a line to correct its price/qty; ✕ removes it (with a few seconds to **Undo**)
+- 💸 **Discount in rupees** and an optional **round-off to the nearest ₹** (shown on the receipt)
+- 🛟 **Resume an unfinished bill** after a refresh or a dead phone, and **reprint your last bill** from the start screen (staff included)
 - ⚡ **Faster billing** — the last price you used is filled in for you, most-billed items show as one-tap chips, recent customer names are suggested
 - 🔁 **Repeat bill** — copy an earlier bill (customer + items) into a new one
 - 💾 **Save Draft** / 🖨️ **Print Bill** — print saves the bill and sends it to the Bluetooth thermal printer in one tap
 - 🔢 **Sequential bill numbers** (MM-000001 …) given when a bill is printed
-- 📊 **Dashboard (owners only)** — Today / Yesterday / 7 days / 30 days / pick-a-date, search by customer or bill number, sales totals
+- 📊 **Dashboard (owners only)** — Today / Yesterday / 7 days / 30 days / pick-a-date, search by customer or bill number, sales totals, **sales by staff**, and a **customer history** (all their bills + total spent)
+- 🏠 **Today's sales** on the Home screen (owners only)
 - 🗑️ **Delete drafts** (one, or all older than 7 days) — printed bills can never be deleted
 - 🚫 **Cancel a printed bill** with a reason (kept in records, left out of sales)
 - ⬇️ **Export to Excel** — bills (with items) and item-wise sales for the period on screen
@@ -130,7 +133,7 @@ npm run build
 |------|-----|--------|
 | 1 | Anyone | **🧾 New Bill** → enter customer name (recent customers are suggested) and date |
 | 2 | Anyone | Type or tap an item (price is pre-filled from last time), set qty → **+ Add to Bill**; ✕ removes a line |
-| 3 | Anyone | Optionally set a discount %, then **🖨️ Print Bill** (saves and prints) or **💾 Save Draft** |
+| 3 | Anyone | Optionally set a discount in ₹ and/or tick *Round off*, then **🖨️ Print Bill** (saves and prints) or **💾 Save Draft** |
 | 4 | Owner | **Dashboard** → find a bill by date/search; open a draft to edit/print/delete it; **🔁 Repeat** a regular customer's bill; **🚫 Cancel** a wrong printed bill; **⬇️ Export** for your accountant |
 
 Printed bills are locked; they can be reprinted, repeated, cancelled or shared from the Dashboard.
