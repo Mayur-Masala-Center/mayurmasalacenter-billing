@@ -304,6 +304,30 @@ function BillEditor({ draftId, copyId }) {
     setCart([]); setDiscount(0); setEditing(null); setUndo(null); setForm({ name: '', price: '', qty: '' })
   }
 
+  // ── Remember new items ──
+  // Names typed on a bill that aren't in the catalog yet are added to it, so they appear in the
+  // Items list and in suggestions next time. Best effort and never awaited: it can't slow down or
+  // block printing, and any failure (offline, no permission, name already there) is simply ignored.
+  const rememberNewItems = lines => {
+    const known = new Set(catalog.map(n => n.toLowerCase().trim()))
+    const fresh = []
+    for (const c of lines) {
+      const name = c.name.trim().replace(/\s+/g, ' ')
+      if (name && !known.has(name.toLowerCase())) { known.add(name.toLowerCase()); fresh.push(name) }
+    }
+    if (!fresh.length) return
+    Promise.all(fresh.map(name =>
+      supabase.from('items').insert({ name }).then(
+        ({ error }) => (!error ? { name, added: true } : error.code === '23505' ? { name, added: false } : null),  // 23505 = already in the catalog
+        () => null)))
+      .then(res => {
+        const ok = res.filter(Boolean), added = ok.filter(r => r.added)
+        if (ok.length) setCatalog(prev => [...prev, ...ok.map(r => r.name)])
+        if (added.length === 1) toast(`Added “${added[0].name}” to your items list`)
+        else if (added.length > 1) toast(`Added ${added.length} new items to your items list`)
+      })
+  }
+
   // ── Save (draft or final) ──
   // Returns the saved bill row, or null on failure.
   const saveBill = async (status) => {
@@ -368,6 +392,7 @@ function BillEditor({ draftId, copyId }) {
     if (!bill) return
     unsavedRef.current = false
     clearProgress(progressKey)
+    rememberNewItems(cart)                       // printed bills only; drafts may still contain typos
     // Browsers only let a page open another app (the printer app) shortly after
     // a tap. If the save was slow enough for that tap to expire, ask for one
     // more tap instead of silently failing to print.
