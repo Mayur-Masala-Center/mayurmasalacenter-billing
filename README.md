@@ -5,7 +5,7 @@ A fast, mobile-friendly manual billing app with Supabase Auth login.
 ## Features
 
 - 🔐 **Login / Sign Up / Forgot Password** via Supabase Auth
-- 📦 **Item catalog** — save item names once (rename or delete any time)
+- 📦 **Item catalog** — save item names once (rename or delete any time). Items you type on a bill are **added to the catalog automatically** when the bill is printed
 - ✏️ **Manual billing** — type or pick an item, enter price and qty. Tap a line to correct its price/qty; ✕ removes it (with a few seconds to **Undo**)
 - 💸 **Discount in rupees** and an optional **round-off to the nearest ₹** (shown on the receipt)
 - 🛟 **Resume an unfinished bill** after a refresh or a dead phone, and **reprint your last bill** from the start screen (staff included)
