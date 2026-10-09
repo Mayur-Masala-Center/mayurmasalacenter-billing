@@ -429,7 +429,7 @@ const STATUS_BADGE = { draft: '💾 Draft', final: '🖨️ Printed', cancelled:
 const dangerBtn = { color: 'var(--danger)', border: '1.5px solid var(--danger)', background: 'none' }
 
 // ── Bill detail modal ───────────────────────────────────────────────
-function BillDetailModal({ bill, onClose, onEdit, onRepeat, onChanged, onCustomer }) {
+function BillDetailModal({ bill, owner, onClose, onEdit, onRepeat, onChanged, onCustomer }) {
   const [items, setItems] = useState([])
   const [loading, setLoading]   = useState(true)
   const [showWhatsApp, setShowWhatsApp] = useState(false)
@@ -593,7 +593,7 @@ function BillDetailModal({ bill, onClose, onEdit, onRepeat, onChanged, onCustome
               {bill.status !== 'draft' && (
                 <button className="btn btn-secondary btn-full btn-sm" title="Start a new bill with the same customer and items" onClick={() => onRepeat(bill)}>🔁 Repeat bill</button>
               )}
-              {bill.status === 'final' && (
+              {owner && bill.status === 'final' && (
                 <button className="btn btn-sm" style={dangerBtn} onClick={() => setCancelling(true)}>🚫 Cancel bill</button>
               )}
             </div>
@@ -744,15 +744,15 @@ export default function DashboardPage() {
         <div>
           <h1 className="page-title">Billing Dashboard</h1>
           <p className="page-subtitle">
-            Drafts, printed bills and sales
+            {owner ? 'Drafts, printed bills and sales' : 'Drafts and printed bills'}
             {owner && <span style={{ marginLeft: 8, background: 'var(--teal-glow)', color: 'var(--teal-dark)', fontSize: '0.72rem', fontWeight: 700, padding: '2px 8px', borderRadius: 99, border: '1px solid var(--teal)' }}>Owner</span>}
           </p>
         </div>
         <button className="btn btn-primary" onClick={() => navigate('/bill')}>+ New Bill</button>
       </div>
 
-      <div className="stats-row">
-        <div className="stat-card"><div className="stat-label">Sales · {periodLabel}</div><div className="stat-value teal" style={{ fontSize: '1.2rem' }}>₹{sales.toFixed(0)}</div></div>
+      <div className="stats-row" style={owner ? undefined : { gridTemplateColumns: 'repeat(2, 1fr)' }}>
+        {owner && <div className="stat-card"><div className="stat-label">Sales · {periodLabel}</div><div className="stat-value teal" style={{ fontSize: '1.2rem' }}>₹{sales.toFixed(0)}</div></div>}
         <div className="stat-card"><div className="stat-label">Printed bills</div><div className="stat-value">{printed.length}</div></div>
         <div className="stat-card"><div className="stat-label">Drafts</div><div className="stat-value" style={{ color: 'var(--warning)' }}>{drafts.length}</div></div>
       </div>
@@ -762,7 +762,7 @@ export default function DashboardPage() {
           <div>
             <div style={{ fontWeight: 700 }}>📋 {customerFocus}</div>
             <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: 2 }}>
-              {custPrinted.length} printed bill{custPrinted.length === 1 ? '' : 's'} · <b style={{ color: 'var(--teal-dark)' }}>₹{custTotal.toFixed(0)}</b> total
+              {custPrinted.length} printed bill{custPrinted.length === 1 ? '' : 's'}{owner && <> · <b style={{ color: 'var(--teal-dark)' }}>₹{custTotal.toFixed(0)}</b> total</>}
               {custPrinted[0] ? ` · last on ${billDay(custPrinted[0])}` : ''}
               {custBills.some(b => b.status === 'draft') ? ` · ${custBills.filter(b => b.status === 'draft').length} draft(s)` : ''}
             </div>
@@ -771,7 +771,7 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {byStaff.length > 0 && !customerFocus && (
+      {owner && byStaff.length > 0 && !customerFocus && (
         <div className="card" style={{ padding: '10px 14px', marginBottom: 12 }}>
           <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Sales by staff · {periodLabel}</div>
           <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
@@ -804,11 +804,11 @@ export default function DashboardPage() {
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
         <input className="form-input" style={{ flex: 1, minWidth: 180 }} placeholder="Search customer or bill number…" value={search} onChange={e => { setSearch(e.target.value); if (customerFocus) setCustomerFocus(null) }} />
-        {status === 'draft' ? (
+        {status === 'draft' ? (owner &&
           <button className="btn btn-sm" style={dangerBtn} disabled={!oldDrafts.length} onClick={() => removeDrafts(oldDrafts, `${oldDrafts.length} draft${oldDrafts.length === 1 ? '' : 's'} older than ${OLD_DRAFT_DAYS} days`)}>
             🧹 Clear old drafts ({oldDrafts.length})
           </button>
-        ) : (
+        ) : (owner &&
           <>
             <button className="btn btn-sm btn-secondary" disabled={exporting} onClick={() => exportCsv('bills')}>⬇️ Bills (Excel)</button>
             <button className="btn btn-sm btn-secondary" disabled={exporting} onClick={() => exportCsv('items')}>⬇️ Items sold</button>
@@ -842,10 +842,12 @@ export default function DashboardPage() {
                 <div style={{ fontSize: '0.68rem', marginTop: 2, color: 'var(--teal-dark)', opacity: 0.85 }}>👤 {bill.created_by.split('@')[0]}</div>
               )}
             </div>
-            <div style={{ textAlign: 'right', flexShrink: 0 }}>
-              <div style={{ fontFamily: 'JetBrains Mono, monospace', fontWeight: 700, fontSize: '0.85rem', textDecoration: bill.status === 'cancelled' ? 'line-through' : 'none' }}>₹{Number(bill.total_amount).toFixed(2)}</div>
-              {Number(bill.discount_amount) > 0 && <div style={{ fontSize: '0.68rem', color: 'var(--danger)' }}>-₹{Number(bill.discount_amount).toFixed(0)} off</div>}
-            </div>
+            {owner && (
+              <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                <div style={{ fontFamily: 'JetBrains Mono, monospace', fontWeight: 700, fontSize: '0.85rem', textDecoration: bill.status === 'cancelled' ? 'line-through' : 'none' }}>₹{Number(bill.total_amount).toFixed(2)}</div>
+                {Number(bill.discount_amount) > 0 && <div style={{ fontSize: '0.68rem', color: 'var(--danger)' }}>-₹{Number(bill.discount_amount).toFixed(0)} off</div>}
+              </div>
+            )}
             <div style={{ flexShrink: 0 }}>
               <span className={`badge badge-${bill.status}`}>{STATUS_BADGE[bill.status]?.split(' ')[0]}</span>
             </div>
@@ -875,7 +877,7 @@ export default function DashboardPage() {
       )}
 
       {selectedBill && (
-        <BillDetailModal bill={selectedBill}
+        <BillDetailModal bill={selectedBill} owner={owner}
           onClose={() => setSelectedBill(null)}
           onChanged={() => { setSelectedBill(null); fetchBills() }}
           onEdit={b => navigate(`/bill/${b.id}`)}
