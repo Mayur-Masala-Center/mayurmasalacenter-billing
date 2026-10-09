@@ -96,11 +96,9 @@ export default function HomePage() {
         <button className="btn btn-primary btn-full btn-lg" onClick={() => navigate('/bill')}>
           🧾 Start New Bill
         </button>
-        {owner && (
-          <button className="btn btn-dark btn-full btn-lg" onClick={() => navigate('/dashboard')}>
-            📊 Billing Dashboard
-          </button>
-        )}
+        <button className="btn btn-dark btn-full btn-lg" onClick={() => navigate('/dashboard')}>
+          📊 Billing Dashboard
+        </button>
         <button className="btn btn-secondary btn-full" onClick={() => navigate('/items')}>
           📦 Manage Items
         </button>
