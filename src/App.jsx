@@ -1,7 +1,7 @@
+import { isOwner } from './lib/roles'
 import { BrowserRouter, Routes, Route, NavLink, useLocation, Navigate } from 'react-router-dom'
 import { ToastProvider } from './components/Toast'
 import { AuthProvider, useAuth } from './lib/AuthContext'
-import { isOwner } from './lib/roles'
 import LoginPage from './pages/LoginPage'
 import HomePage from './pages/HomePage'
 import ItemsPage from './pages/ItemsPage'
@@ -37,15 +37,6 @@ function ProtectedRoute({ children }) {
   return children
 }
 
-// Only owners can access the dashboard — others see a locked screen
-function OwnerRoute({ children }) {
-  const { session, user, loading } = useAuth()
-  if (loading) return <LoadingScreen />
-  if (!session) return <Navigate to="/login" replace />
-  if (!isOwner(user?.email)) return <AccessDenied />
-  return children
-}
-
 function PublicRoute({ children }) {
   const { session, loading } = useAuth()
   if (loading) return <LoadingScreen />
@@ -53,29 +44,10 @@ function PublicRoute({ children }) {
   return children
 }
 
-function AccessDenied() {
-  return (
-    <div style={{
-      minHeight: '80vh', display: 'flex', flexDirection: 'column',
-      alignItems: 'center', justifyContent: 'center',
-      padding: '32px 24px', textAlign: 'center',
-    }}>
-      <div style={{ fontSize: '3.5rem', marginBottom: 16 }}>🔒</div>
-      <h2 style={{ fontSize: '1.4rem', fontWeight: 700, color: 'var(--ink)', marginBottom: 8 }}>
-        Access Restricted
-      </h2>
-      <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', maxWidth: 320, lineHeight: 1.6 }}>
-        The billing dashboard is only accessible to authorised owners.
-        Please contact the store owner if you need access.
-      </p>
-    </div>
-  )
-}
-
 function Nav() {
   const location = useLocation()
   const { user, signOut } = useAuth()
-  const owner = isOwner(user?.email)
+  const owner = isOwner(user?.email)            // only used for the owner badge next to the name
 
   if (location.pathname.startsWith('/bill')) return null
 
@@ -100,12 +72,10 @@ function Nav() {
           🧾 New Bill
         </NavLink>
 
-        {/* Dashboard only visible to owners */}
-        {owner && (
-          <NavLink to="/dashboard" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-            Dashboard
-          </NavLink>
-        )}
+        {/* Dashboard: everyone can open it; money is hidden from staff inside the page */}
+        <NavLink to="/dashboard" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+          Dashboard
+        </NavLink>
 
         {/* User chip + sign out */}
         <div style={{
@@ -148,7 +118,7 @@ function AppShell() {
         <Route path="/bill"      element={<ProtectedRoute><BillPage /></ProtectedRoute>} />
         <Route path="/bill/:id"  element={<ProtectedRoute><BillPage /></ProtectedRoute>} />
         <Route path="/scan"      element={<Navigate to="/bill" replace />} />
-        <Route path="/dashboard" element={<OwnerRoute><DashboardPage /></OwnerRoute>} />
+        <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
         <Route path="*"          element={<Navigate to="/" replace />} />
       </Routes>
     </div>
