@@ -13,7 +13,7 @@ A fast, mobile-friendly manual billing app with Supabase Auth login.
 - 🔁 **Repeat bill** — copy an earlier bill (customer + items) into a new one
 - 💾 **Save Draft** / 🖨️ **Print Bill** — print saves the bill and sends it to the Bluetooth thermal printer in one tap
 - 🔢 **Sequential bill numbers** (MM-000001 …) given when a bill is printed
-- 📊 **Dashboard (owners only)** — Today / Yesterday / 7 days / 30 days / pick-a-date, search by customer or bill number, sales totals, **sales by staff**, and a **customer history** (all their bills + total spent)
+- 📊 **Dashboard** — everyone can open it, but **staff see no amounts in the bill list, no sales totals, no staff totals and no exports** (those are owner-only; staff can still open a bill to see/print it). Owners get — Today / Yesterday / 7 days / 30 days / pick-a-date, search by customer or bill number, sales totals, **sales by staff**, and a **customer history** (all their bills + total spent)
 - 🏠 **Today's sales** on the Home screen (owners only)
 - 🗑️ **Delete drafts** (one, or all older than 7 days) — printed bills can never be deleted
 - 🚫 **Cancel a printed bill** with a reason (kept in records, left out of sales)
@@ -160,4 +160,4 @@ Printed bills are locked; they can be reprinted or shared from the Dashboard.
 ## Notes
 
 - Printing uses the **Bluetooth Print** Android app via a `my.bluetoothprint.scheme://` deep link (unchanged).
-- Only owners (see `src/lib/roles.js`) can open the Dashboard.
+- Owners (see `src/lib/roles.js`) see all money figures on the Dashboard; staff see bills without amounts. This hides figures on screen only — the amounts are still in the data the phone downloads, so it is not protection against a technical person.
