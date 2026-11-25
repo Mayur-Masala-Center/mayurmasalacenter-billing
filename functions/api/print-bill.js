@@ -87,7 +87,7 @@ export async function onRequestGet(context) {
   const rows = []
 
   // Top Logo
-  const logoUrl = env.LOGO_URL || `${url.origin}/logo.png`
+  const logoUrl = env.LOGO_URL || `${url.origin}/logo_small.jpg`
   rows.push(image(logoUrl, { align: 1 }))
   rows.push(BLANK)
 
