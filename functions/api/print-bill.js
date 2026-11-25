@@ -179,9 +179,8 @@ export async function onRequestGet(context) {
   rows.push(text('Thank you!', { bold: 1, align: 1, format: 3 }))
   rows.push(text('Shopping with us', { align: 1, format: 4 }))
   rows.push(text(SHOP.tagline, { align: 1, format: 0 }))
-  if (SHOP.website) {
-    rows.push(text(SHOP.website, { align: 1, format: 0 }))
-  }
+  rows.push(text('Billing by Stellar Forge', { align: 1, format: 0 }))
+  rows.push(text('(www.stellarforgetech.in)', { align: 1, format: 0 }))
   rows.push(BLANK)
   rows.push(BLANK)
 

@@ -163,7 +163,7 @@ function printBill(bill, items, upiConfig) {
   <div class="ftr">
     Thank you for shopping with us!<br>
     <small>${SHOP.tagline}</small><br>
-    <small>${SHOP.website}</small>
+    <small>Billing by Stellar Forge (www.stellarforgetech.in)</small>
   </div>
 </body>
 <script>
