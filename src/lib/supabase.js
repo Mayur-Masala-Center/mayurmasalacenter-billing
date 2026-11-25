@@ -69,5 +69,17 @@ create policy "Auth read bill_items"   on bill_items for select using (auth.role
 create policy "Auth insert bill_items" on bill_items for insert with check (auth.role() = 'authenticated');
 create policy "Auth delete bill_items" on bill_items for delete using (auth.role() = 'authenticated');
 
+-- Store settings table (e.g. UPI QR configuration)
+create table if not exists store_settings (
+  key text primary key,
+  value jsonb not null,
+  updated_at timestamptz default now()
+);
+
+alter table store_settings enable row level security;
+create policy "Auth read store_settings"   on store_settings for select using (auth.role() = 'authenticated');
+create policy "Auth insert store_settings" on store_settings for insert with check (auth.role() = 'authenticated');
+create policy "Auth update store_settings" on store_settings for update using (auth.role() = 'authenticated');
+
 ==========================================
 */

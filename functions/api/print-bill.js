@@ -8,6 +8,7 @@ const SHOP = {
   sub:     '& Pooja Bhandar',
   address: 'Shagun Chowk, Pimpri',
   phone:   '+919359117213',
+  website: 'www.mayurmasalacenter.in',
   tagline: 'Quality Masala & Pooja Items',
 }
 
@@ -24,7 +25,14 @@ const pad = (str, len, right = false) => {
 const text = (content, { bold = 0, align = 0, format = 0 } = {}) =>
   ({ type: 0, content, bold, align, format })
 
-const SOLID  = '================================'
+const image = (path, { align = 1 } = {}) =>
+  ({ type: 1, path, align })
+
+const qrCode = (value, { size = 35, align = 1 } = {}) =>
+  ({ type: 3, value, size, align })
+
+const SOLID  = '================================================'
+const DASHED = '------------------------------------------------'
 const BLANK  = { type: 0, content: ' ', bold: 0, align: 0, format: 0 }
 
 const corsHeaders = {
@@ -66,13 +74,31 @@ export async function onRequestGet(context) {
   const { data: items = [] } = await supabase
     .from('bill_items').select('*').eq('bill_id', id).order('created_at')
 
+  // Fetch optional UPI configuration from store_settings
+  let upiConfig = null
+  try {
+    const { data: setting } = await supabase
+      .from('store_settings').select('value').eq('key', 'upi_config').maybeSingle()
+    if (setting && setting.value) upiConfig = setting.value
+  } catch (err) {
+    console.warn('store_settings query error (ignored):', err)
+  }
+
   const rows = []
+
+  // Top Logo
+  const logoUrl = env.LOGO_URL || `${url.origin}/logo.png`
+  rows.push(image(logoUrl, { align: 1 }))
+  rows.push(BLANK)
 
   // Header
   rows.push(text(SHOP.name,    { bold: 1, align: 1, format: 2 }))
   rows.push(text(SHOP.sub,     { bold: 1, align: 1, format: 3 }))
   rows.push(text(SHOP.address, { align: 1, format: 0 }))
   rows.push(text(`Ph: ${SHOP.phone}`, { align: 1, format: 0 }))
+  if (SHOP.website) {
+    rows.push(text(SHOP.website, { align: 1, format: 0 }))
+  }
   rows.push(text(SOLID))
 
   // Bill meta — IST timezone explicitly set.
@@ -93,19 +119,19 @@ export async function onRequestGet(context) {
   }
   rows.push(text(SOLID))
 
-  rows.push(text('# Item       Qty  Rate    Amt', { bold: 1, format: 0 }))
-  rows.push(text('------------------------------', { format: 0 }))
+  rows.push(text('#  Item                    Qty    Rate       Amt', { bold: 1, format: 0 }))
+  rows.push(text(DASHED, { format: 0 }))
 
   let subtotal = 0
   ;(items || []).forEach((item, i) => {
     const rate = Number(item.item_price)
     const amt  = rate * Number(item.quantity)
     subtotal  += amt
-    const num   = pad(i + 1, 1)
-    const name  = pad(item.item_name, 10)
-    const qty   = pad(item.quantity,   3, true)
-    const rateS = pad(rate.toFixed(2), 6, true)
-    const amtS  = pad(amt.toFixed(2),  7, true)
+    const num   = pad(i + 1, 2)
+    const name  = pad(item.item_name, 23)
+    const qty   = pad(item.quantity,   4, true)
+    const rateS = pad(rate.toFixed(2), 7, true)
+    const amtS  = pad(amt.toFixed(2),  8, true)
     rows.push(text(`${num} ${name} ${qty} ${rateS} ${amtS}`, { format: 0 }))
   })
 
@@ -136,10 +162,26 @@ export async function onRequestGet(context) {
     rows.push(text('** CANCELLED **', { bold: 1, align: 1, format: 3 }))
   }
 
+  // UPI Payment QR code (if enabled and bill is not cancelled)
+  if (upiConfig && upiConfig.enabled && upiConfig.upi_id && bill.status !== 'cancelled' && total > 0) {
+    const upiId = upiConfig.upi_id.trim()
+    const payeeName = encodeURIComponent((upiConfig.payee_name || SHOP.name).trim())
+    const note = encodeURIComponent(`Bill ${billNo(bill)}`)
+    const upiUri = `upi://pay?pa=${upiId}&pn=${payeeName}&am=${total.toFixed(2)}&cu=INR&tn=${note}`
+
+    rows.push(BLANK)
+    rows.push(text('Scan & Pay via UPI', { bold: 1, align: 1, format: 0 }))
+    rows.push(qrCode(upiUri, { size: 35, align: 1 }))
+    rows.push(text(`UPI: ${upiId}`, { align: 1, format: 0 }))
+  }
+
   rows.push(BLANK)
   rows.push(text('Thank you!', { bold: 1, align: 1, format: 3 }))
   rows.push(text('Shopping with us', { align: 1, format: 4 }))
   rows.push(text(SHOP.tagline, { align: 1, format: 0 }))
+  if (SHOP.website) {
+    rows.push(text(SHOP.website, { align: 1, format: 0 }))
+  }
   rows.push(BLANK)
   rows.push(BLANK)
 

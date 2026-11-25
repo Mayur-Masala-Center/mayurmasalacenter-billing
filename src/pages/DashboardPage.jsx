@@ -17,6 +17,7 @@ const SHOP = {
   address: 'Shagun Chowk, Pimpri',
   address2: 'Pimpri-Chinchwad, Maharashtra 411017',
   phone:   '+919359117213',
+  website: 'www.mayurmasalacenter.in',
   tagline: 'Quality Masala & Pooja Items',
 }
 
@@ -31,16 +32,33 @@ function billingDateObj(bill) {
     : new Date(bill.created_at)
 }
 // ── Print receipt ─────────────────────────────────────────────────
-// Builds a 58mm-optimised HTML receipt, opens it in a new tab, and
+// Builds an 80mm-optimised HTML receipt, opens it in a new tab, and
 // calls window.print() automatically — Android then shows the native
 // print dialog where the paired Bluetooth printer appears directly.
-function printBill(bill, items) {
+function printBill(bill, items, upiConfig) {
   const dateStr  = billingDateObj(bill).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'Asia/Kolkata' })
   const timeStr  = new Date(bill.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' })
   const subtotal = Number(bill.total_amount) + Number(bill.discount_amount || 0)
   const discPct  = Number(bill.discount_percent || 0)
   const discAmt  = Number(bill.discount_amount  || 0)
   const total    = Number(bill.total_amount)
+
+  let upiHtml = ''
+  if (upiConfig && upiConfig.enabled && upiConfig.upi_id && bill.status !== 'cancelled' && total > 0) {
+    const upiId = upiConfig.upi_id.trim()
+    const payeeName = encodeURIComponent((upiConfig.payee_name || SHOP.name).trim())
+    const note = encodeURIComponent(`Bill ${billNo(bill)}`)
+    const upiUri = `upi://pay?pa=${upiId}&pn=${payeeName}&am=${total.toFixed(2)}&cu=INR&tn=${note}`
+    const qrImgUrl = `https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${encodeURIComponent(upiUri)}`
+
+    upiHtml = `
+      <div style="text-align: center; margin: 10px 0 6px;">
+        <div style="font-size: 13px; font-weight: bold;">Scan & Pay via UPI</div>
+        <img src="${qrImgUrl}" alt="UPI QR" style="width: 32mm; height: 32mm; margin: 4px auto; display: block;" />
+        <div style="font-size: 12px; color: #444;">${upiId}</div>
+      </div>
+      <hr class="dd">`
+  }
 
   const itemRows = items.map((item, i) => `
     <tr>
@@ -66,12 +84,12 @@ function printBill(bill, items) {
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Bill ${billNo(bill)}</title>
   <style>
-    @page { size: 58mm auto; margin: 2mm 1px; }
+    @page { size: 80mm auto; margin: 3mm 2px; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       font-family: 'Courier New', Courier, monospace;
       font-size: 16px;
-      width: 56mm;
+      width: 76mm;
       color: #000;
       background: #fff;
     }
@@ -86,11 +104,11 @@ function printBill(bill, items) {
     table { width: 100%; border-collapse: collapse; }
     th  { font-size: 15px; font-weight: bold; padding: 3px 0; border-bottom: 1px dashed #888; text-align: left; }
     td  { font-size: 16px; padding: 2px 0; vertical-align: top; line-height: 1.4; }
-    td.c { text-align: center; width: 18px; }
+    td.c { text-align: center; width: 35px; }
     td.r { text-align: right; }
-    td:nth-child(1) { width: 14px; font-size: 14px; color: #555; }
-    td:nth-child(4) { width: 34px; }
-    td:nth-child(5) { width: 36px; }
+    td:nth-child(1) { width: 22px; font-size: 14px; color: #555; }
+    td:nth-child(4) { width: 60px; }
+    td:nth-child(5) { width: 70px; }
     .sub td  { font-size: 15px; color: #333; padding-top: 4px; }
     .disc td { color: #c00; font-size: 15px; }
     .tot     { border-top: 2px solid #000; }
@@ -104,11 +122,15 @@ function printBill(bill, items) {
 </head>
 <body>
   <div class="hdr">
+    <div style="text-align: center; margin-bottom: 6px;">
+      <img src="/logo.png" alt="Logo" style="max-width: 50mm; height: auto; display: block; margin: 0 auto 4px;" />
+    </div>
     <div class="s1">${SHOP.name}</div>
     <div class="s2">${SHOP.sub}</div>
     <div class="s3">${SHOP.address}</div>
     <div class="s3">${SHOP.address2}</div>
     ${SHOP.phone ? `<div class="s3">Ph: ${SHOP.phone}</div>` : ''}
+    ${SHOP.website ? `<div class="s3">${SHOP.website}</div>` : ''}
   </div>
   <hr class="dl">
   <div class="meta">
@@ -137,9 +159,11 @@ function printBill(bill, items) {
       <td colspan="4" class="r"><b>Rs. ${total.toFixed(2)}</b></td>
     </tr>
   </table>
+  ${upiHtml}
   <div class="ftr">
     Thank you for shopping with us!<br>
-    <small>${SHOP.tagline}</small>
+    <small>${SHOP.tagline}</small><br>
+    <small>${SHOP.website}</small>
   </div>
 </body>
 <script>
@@ -640,6 +664,39 @@ export default function DashboardPage() {
   const [exporting, setExporting] = useState(false)
   const [customerFocus, setCustomerFocus] = useState(null)   // show one customer's full history
 
+  // ── UPI Settings (Owner only) ──
+  const [upiConfig, setUpiConfig] = useState({ enabled: false, upi_id: '', payee_name: 'Mayur Masala Center' })
+  const [savingUpi, setSavingUpi] = useState(false)
+
+  useEffect(() => {
+    supabase.from('store_settings').select('value').eq('key', 'upi_config').maybeSingle()
+      .then(({ data }) => {
+        if (data?.value) setUpiConfig(data.value)
+      })
+      .catch(err => console.warn('Could not load store_settings:', err))
+  }, [])
+
+  const handleSaveUpi = async (e) => {
+    e?.preventDefault()
+    setSavingUpi(true)
+    try {
+      const { error } = await supabase.from('store_settings').upsert({
+        key: 'upi_config',
+        value: {
+          enabled: Boolean(upiConfig.enabled),
+          upi_id: (upiConfig.upi_id || '').trim(),
+          payee_name: (upiConfig.payee_name || 'Mayur Masala Center').trim(),
+        },
+        updated_at: new Date().toISOString()
+      })
+      if (error) throw error
+      toast('UPI settings saved!')
+    } catch (err) {
+      toast('Failed to save UPI settings: ' + err.message, 'error')
+    }
+    setSavingUpi(false)
+  }
+
   const fetchBills = useCallback(async () => {
     const [drafts, rest] = await Promise.all([
       supabase.from('bills').select('*').eq('status', 'draft'),
@@ -756,6 +813,56 @@ export default function DashboardPage() {
         <div className="stat-card"><div className="stat-label">Printed bills</div><div className="stat-value">{printed.length}</div></div>
         <div className="stat-card"><div className="stat-label">Drafts</div><div className="stat-value" style={{ color: 'var(--warning)' }}>{drafts.length}</div></div>
       </div>
+
+      {owner && (
+        <div className="card" style={{ padding: '14px 16px', marginBottom: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, flexWrap: 'wrap', gap: 8 }}>
+            <div style={{ fontWeight: 700, fontSize: '0.95rem' }}>📱 UPI Payment QR on Bills</div>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: '0.88rem', fontWeight: 600 }}>
+              <input
+                type="checkbox"
+                checked={Boolean(upiConfig.enabled)}
+                onChange={e => setUpiConfig(c => ({ ...c, enabled: e.target.checked }))}
+                style={{ width: 16, height: 16, cursor: 'pointer' }}
+              />
+              Print UPI QR on Bill
+            </label>
+          </div>
+
+          {upiConfig.enabled && (
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end', marginTop: 10 }}>
+              <div style={{ flex: '1 1 220px' }}>
+                <label style={{ fontSize: '0.78rem', color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>UPI ID (VPA)</label>
+                <input
+                  className="form-input"
+                  style={{ width: '100%', padding: '8px 12px', fontSize: '0.9rem' }}
+                  placeholder="e.g. 9359117213@okbizaxis or merchant@upi"
+                  value={upiConfig.upi_id || ''}
+                  onChange={e => setUpiConfig(c => ({ ...c, upi_id: e.target.value }))}
+                />
+              </div>
+              <div style={{ flex: '1 1 200px' }}>
+                <label style={{ fontSize: '0.78rem', color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>Payee Name (Optional)</label>
+                <input
+                  className="form-input"
+                  style={{ width: '100%', padding: '8px 12px', fontSize: '0.9rem' }}
+                  placeholder="Mayur Masala Center"
+                  value={upiConfig.payee_name || ''}
+                  onChange={e => setUpiConfig(c => ({ ...c, payee_name: e.target.value }))}
+                />
+              </div>
+              <button
+                className="btn btn-secondary btn-sm"
+                style={{ height: 38, padding: '0 16px', fontWeight: 600 }}
+                disabled={savingUpi}
+                onClick={handleSaveUpi}
+              >
+                {savingUpi ? 'Saving…' : 'Save UPI Settings'}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       {customerFocus && (
         <div className="card" style={{ padding: '12px 14px', marginBottom: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
