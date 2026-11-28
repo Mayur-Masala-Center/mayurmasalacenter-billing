@@ -13,6 +13,8 @@ import `in`.stellarforge.billing.data.model.BillItem
 import `in`.stellarforge.billing.sync.DebugLog
 import `in`.stellarforge.billing.util.BillUtils
 import java.io.ByteArrayOutputStream
+import java.text.SimpleDateFormat
+import java.util.*
 
 class EscPosBuilder(private val paperWidthMm: Int = 80) {
 
@@ -31,7 +33,7 @@ class EscPosBuilder(private val paperWidthMm: Int = 80) {
     fun cut() { esc(0x1D, 0x56, 0x00) }
 
     fun text(s: String) {
-        // Write as UTF-8 bytes; most modern thermal printers support UTF-8 or at least Latin-1
+        // Write as UTF-8 bytes
         out.write(s.toByteArray(Charsets.UTF_8))
         out.write(0x0A) // LF
     }
@@ -43,7 +45,7 @@ class EscPosBuilder(private val paperWidthMm: Int = 80) {
 
     /**
      * Render a text string as a 1-bit raster bitmap and send via GS v 0.
-     * Required for Devanagari (Hindi/Marathi) and any text the printer font can't handle.
+     * Required for Devanagari (Hindi/Marathi) and custom font styling.
      */
     fun textAsBitmap(s: String, textSizeSp: Float = 24f, bold: Boolean = false) {
         val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -114,43 +116,68 @@ class EscPosBuilder(private val paperWidthMm: Int = 80) {
     fun padLeft(s: String, len: Int) = s.take(len).padStart(len)
 
     /**
-     * Build the complete receipt for a bill.
+     * Build the complete receipt matching web app SHOP config and format:
+     * - Store Logo
+     * - Store Name: Mayur Masala Center
+     * - Subtitle: and Pooja Bhandar
+     * - Address 1: Shagun Chowk, Pimpri
+     * - Address 2: Pimpri-Chinchwad, Maharashtra 411017
+     * - Phone: +919359117213
+     * - Website: www.mayurmasalacenter.in
+     * - Bill No, Date & Time (IST)
+     * - Customer Name & Staff name
+     * - Items table (#, Item, Qty, Rate, Amt)
+     * - Subtotal, Discount, Round-off, Total
+     * - Dynamic UPI QR code with amount pre-filled
+     * - Footer: Thank you for shopping with us! / Tagline / Stellar Forge credit
      */
     fun buildReceipt(bill: Bill, items: List<BillItem>, upiConfig: UpiConfig?, logoBitmap: Bitmap?): ByteArray {
         out.reset()
         reset()
 
-        // Logo
+        // 1. Logo
         if (logoBitmap != null) {
             align(1)
-            val scaled = Bitmap.createScaledBitmap(logoBitmap, dotWidth, (logoBitmap.height.toFloat() / logoBitmap.width * dotWidth).toInt(), true)
+            val scaled = Bitmap.createScaledBitmap(
+                logoBitmap,
+                dotWidth,
+                (logoBitmap.height.toFloat() / logoBitmap.width * dotWidth).toInt(),
+                true
+            )
             rasterImage(scaled)
             feed(1)
         }
 
-        // Header (use textAsBitmap for Devanagari shop name on Hindi receipts)
+        // 2. Header (Matching web app SHOP object exactly)
         align(1)
-        bold(true); text("Mayur Masala"); bold(false)
-        text("& Pooja Bhandar")
+        bold(true); doubleHeight(true); text("Mayur Masala Center"); doubleHeight(false); bold(false)
+        text("and Pooja Bhandar")
         text("Shagun Chowk, Pimpri")
+        text("Pimpri-Chinchwad, Maharashtra 411017")
         text("Ph: +919359117213")
         text("www.mayurmasalacenter.in")
         separator(false)
 
-        // Bill meta
+        // 3. Bill Metadata
         align(0)
-        text("Bill: ${BillUtils.billNo(bill)}  Date: ${BillUtils.formatDate(bill.createdAt)} ${BillUtils.formatTime(bill.createdAt)}")
-        text("Cust: ${bill.customerName}")
-        separator(false)
+        val billingDateStr = bill.billingDate ?: BillUtils.formatDate(bill.createdAt)
+        val timeStr = BillUtils.formatTime(bill.createdAt)
+        text("Bill: ${BillUtils.billNo(bill)}")
+        text("Date: $billingDateStr $timeStr")
+        text("Customer: ${bill.customerName}")
+        bill.createdBy?.let { staff ->
+            text("Staff: ${staff.substringBefore("@")}")
+        }
+        separator(true)
 
-        // Items header
+        // 4. Items Table Header
         bold(true)
         val h = "#  ${padRight("Item", charCols - 20)}  ${padLeft("Qty", 4)} ${padLeft("Rate", 7)} ${padLeft("Amt", 8)}"
         text(h)
         bold(false)
         separator(true)
 
-        // Line items
+        // 5. Line items
         var subtotal = 0.0
         items.forEachIndexed { i, item ->
             val amt = item.itemPrice * item.quantity
@@ -158,39 +185,47 @@ class EscPosBuilder(private val paperWidthMm: Int = 80) {
             val num = padRight("${i + 1}", 2)
             val name = padRight(item.itemName, charCols - 23)
             val qty = padLeft("${item.quantity}", 4)
-            val rate = padLeft(String.format("%.2f", item.itemPrice), 7)
-            val amtS = padLeft(String.format("%.2f", amt), 8)
+            val rate = padLeft(String.format(Locale.US, "%.2f", item.itemPrice), 7)
+            val amtS = padLeft(String.format(Locale.US, "%.2f", amt), 8)
             text("$num $name $qty $rate $amtS")
         }
 
         separator(false)
 
-        // Totals
+        // 6. Totals Breakdown (Subtotal, Discount, Round-off, Total)
         val discount = if (bill.discountPercent > 0) subtotal * bill.discountPercent / 100.0 else bill.discountAmount
-        val raw = subtotal - discount
-        val total = Math.round(raw).toDouble()
-        val roundOff = total - raw
+        val raw = (subtotal - discount).coerceAtLeast(0.0)
+        val total = bill.totalAmount
+        val roundDiff = total - raw
 
-        text("${padRight("Subtotal", charCols - 10)}${padLeft(String.format("%.2f", subtotal), 10)}")
-        if (discount > 0.01) text("${padRight("Discount", charCols - 10)}${padLeft("-" + String.format("%.2f", discount), 10)}")
-        if (Math.abs(roundOff) > 0.001) text("${padRight("Round-off", charCols - 10)}${padLeft(String.format("%+.2f", roundOff), 10)}")
+        text("${padRight("Subtotal", charCols - 12)}${padLeft(String.format(Locale.US, "%.2f", subtotal), 12)}")
+        if (discount > 0.01) {
+            text("${padRight("Discount", charCols - 12)}${padLeft("-" + String.format(Locale.US, "%.2f", discount), 12)}")
+        }
+        if (Math.abs(roundDiff) >= 0.005) {
+            val sign = if (roundDiff > 0) "+" else "-"
+            text("${padRight("Round-off", charCols - 12)}${padLeft(sign + String.format(Locale.US, "%.2f", Math.abs(roundDiff)), 12)}")
+        }
         separator(false)
-        bold(true); text("${padRight("TOTAL", charCols - 10)}${padLeft(String.format("%.2f", total), 10)}"); bold(false)
+        bold(true); doubleHeight(true)
+        text("${padRight("TOTAL", charCols - 12)}${padLeft("Rs. " + String.format(Locale.US, "%.2f", total), 12)}")
+        doubleHeight(false); bold(false)
 
-        // UPI QR
+        // 7. Dynamic UPI QR Code (Generated on the fly with bill amount prefilled)
         if (upiConfig != null && upiConfig.enabled && upiConfig.upiId.isNotBlank() && bill.status != "cancelled" && total > 0) {
             feed(1)
             align(1)
             bold(true); text("Scan & Pay via UPI"); bold(false)
             val upiUri = upiConfig.upiUri(total, BillUtils.billNo(bill))
             qrCodeFromUri(upiUri, sizePx = if (paperWidthMm == 58) 200 else 300)
-            align(1); text("UPI: ${upiConfig.upiId}")
+            align(1)
+            text(upiConfig.upiId)
+            separator(true)
         }
 
-        // Footer
+        // 8. Footer (Matching web app)
         feed(1); align(1)
-        bold(true); text("Thank you!"); bold(false)
-        text("Shopping with us")
+        bold(true); text("Thank you for shopping with us!"); bold(false)
         text("Quality Masala & Pooja Items")
         text("Billing by Stellar Forge")
         text("(www.stellarforgetech.in)")
