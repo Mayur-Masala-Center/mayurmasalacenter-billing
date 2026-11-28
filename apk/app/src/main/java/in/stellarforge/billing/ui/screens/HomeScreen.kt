@@ -25,6 +25,7 @@ import `in`.stellarforge.billing.sync.SyncState
 import `in`.stellarforge.billing.sync.SyncStatusMonitor
 import `in`.stellarforge.billing.ui.viewmodels.BillViewModel
 import `in`.stellarforge.billing.util.BillUtils
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
 
 @Composable

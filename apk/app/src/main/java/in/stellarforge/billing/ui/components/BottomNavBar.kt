@@ -47,7 +47,7 @@ fun BottomNavBar(navController: NavController) {
                 icon = { Text(item.icon) },
                 label = { Text(item.label, color = if (selected) Color(0xFF00C9A7) else Color(0xFF8B949E)) },
                 colors = NavigationBarItemDefaults.colors(
-                    selectedIndicatorColor = Color(0xFF00C9A7).copy(alpha = 0.15f)
+                    indicatorColor = Color(0xFF00C9A7).copy(alpha = 0.15f)
                 )
             )
         }

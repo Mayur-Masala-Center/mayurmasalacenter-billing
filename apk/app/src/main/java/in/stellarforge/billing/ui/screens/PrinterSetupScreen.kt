@@ -39,7 +39,7 @@ fun PrinterSetupScreen(
     var hasPermission by remember { mutableStateOf(checkBluetoothPermission(context)) }
     var selectedMac by remember { mutableStateOf(printerManager?.getSavedPrinterMac()) }
     var paperWidth by remember { mutableStateOf(printerManager?.getSavedPaperWidth()?.toString() ?: "80") }
-    val printState by (printerManager?.printState ?: remember { mutableStateOf(PrintState.Idle) }).collectAsState()
+    val printState by (printerManager?.printState ?: kotlinx.coroutines.flow.MutableStateFlow(PrintState.Idle)).collectAsState()
 
     val permLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { perms ->
         hasPermission = perms.values.all { it }
