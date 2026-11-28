@@ -3,3 +3,9 @@ dist/
 .env
 .DS_Store
 *.local
+
+# Android release signing — never commit these
+release.keystore
+keystore_base64.txt
+*.jks
+*.keystore
