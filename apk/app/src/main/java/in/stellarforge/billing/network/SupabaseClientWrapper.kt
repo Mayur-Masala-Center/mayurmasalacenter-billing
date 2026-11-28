@@ -91,7 +91,8 @@ class SupabaseClientWrapper @Inject constructor(
     }
 
     /**
-     * Paged fetch with order by updated_at ASC, id ASC to handle pagination ties safely
+     * Paged fetch with order by updated_at ASC, and primary key ASC to handle pagination ties safely.
+     * For store_settings, the primary key column is "key", for all other tables it is "id".
      */
     suspend fun fetchRowsSince(tableName: String, since: Long, pageSize: Long = 100): Result<List<JsonObject>> {
         return try {
@@ -99,10 +100,12 @@ class SupabaseClientWrapper @Inject constructor(
                 timeZone = java.util.TimeZone.getTimeZone("UTC")
             }.format(java.util.Date(since))
 
+            val pkColumn = if (tableName == "store_settings") "key" else "id"
+
             val result = client.postgrest[tableName].select {
                 filter { gte("updated_at", isoSince) }
                 order(column = "updated_at", order = Order.ASCENDING)
-                order(column = "id", order = Order.ASCENDING)
+                order(column = pkColumn, order = Order.ASCENDING)
                 limit(count = pageSize)
             }.decodeList<JsonObject>()
             Result.success(result)
