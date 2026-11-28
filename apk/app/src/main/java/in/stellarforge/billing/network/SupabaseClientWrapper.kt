@@ -4,9 +4,9 @@ import in.stellarforge.billing.BuildConfig
 import in.stellarforge.billing.auth.AuthManager
 import in.stellarforge.billing.sync.DebugLog
 import io.github.jan.supabase.createSupabaseClient
-import io.github.jan.supabase.gotrue.GoTrue
-import io.github.jan.supabase.gotrue.gotrue
-import io.github.jan.supabase.gotrue.providers.builtin.Email
+import io.github.jan.supabase.auth.Auth
+import io.github.jan.supabase.auth.auth
+import io.github.jan.supabase.auth.providers.builtin.Email
 import io.github.jan.supabase.postgrest.Postgrest
 import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.postgrest.query.Order
@@ -22,17 +22,17 @@ class SupabaseClientWrapper @Inject constructor(
         supabaseUrl = BuildConfig.SUPABASE_URL,
         supabaseKey = BuildConfig.SUPABASE_ANON_KEY
     ) {
-        install(GoTrue)
+        install(Auth)
         install(Postgrest)
     }
 
     suspend fun signIn(email: String, password: String): Result<Unit> {
         return try {
-            client.gotrue.loginWith(Email) {
+            client.auth.signInWith(Email) {
                 this.email = email
                 this.password = password
             }
-            val session = client.gotrue.currentSessionOrNull()
+            val session = client.auth.currentSessionOrNull()
             val userEmail = session?.user?.email ?: email
             val accessToken = session?.accessToken ?: ""
             val refreshToken = session?.refreshToken ?: ""
@@ -47,7 +47,7 @@ class SupabaseClientWrapper @Inject constructor(
 
     suspend fun signOut() {
         try {
-            client.gotrue.logout()
+            client.auth.signOut()
         } catch (e: Exception) {
             DebugLog.log("Auth", "Sign-out error: ${e.message}")
         }

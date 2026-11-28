@@ -114,11 +114,11 @@ dependencies {
     // WorkManager
     implementation("androidx.work:work-runtime-ktx:2.9.1")
 
-    // Supabase
-    implementation(platform("io.github.jan-tennermann:bom:2.6.1"))
-    implementation("io.github.jan-tennermann:postgrest-kt")
-    implementation("io.github.jan-tennermann:gotrue-kt")
-    implementation("io.ktor:ktor-client-android:2.3.12")
+    // Supabase (v3 — group: io.github.jan-tennert.supabase, auth-kt replaces gotrue-kt, requires Ktor 3)
+    implementation(platform("io.github.jan-tennert.supabase:bom:3.9.0"))
+    implementation("io.github.jan-tennert.supabase:postgrest-kt")
+    implementation("io.github.jan-tennert.supabase:auth-kt")
+    implementation("io.ktor:ktor-client-android:3.1.3")
 
     // Serialization
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
