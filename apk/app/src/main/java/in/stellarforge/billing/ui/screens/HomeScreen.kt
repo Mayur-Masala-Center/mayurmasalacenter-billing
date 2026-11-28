@@ -13,7 +13,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Print
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material3.*
@@ -27,6 +26,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import `in`.stellarforge.billing.auth.AppUser
 import `in`.stellarforge.billing.data.model.Bill
 import `in`.stellarforge.billing.printer.BluetoothPrinterManager
 import `in`.stellarforge.billing.sync.SyncScheduler
@@ -42,6 +42,7 @@ import java.util.*
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
+    currentUser: AppUser? = null,
     onBillClick: (String) -> Unit,
     onNewBill: () -> Unit,
     printerManager: BluetoothPrinterManager? = null,
@@ -52,6 +53,8 @@ fun HomeScreen(
     val bills by viewModel.allBills.collectAsState()
     val syncState by SyncStatusMonitor.syncState.collectAsState()
     val lastSynced by SyncStatusMonitor.lastSyncedTime.collectAsState()
+
+    val isOwner = currentUser?.isOwner ?: false
 
     // Status filter: "all", "draft", "final", "cancelled"
     var selectedStatus by remember { mutableStateOf("all") }
@@ -203,7 +206,7 @@ fun HomeScreen(
 
             Spacer(Modifier.height(8.dp))
 
-            // Row 1: Status Tabs (All, Drafts, Printed, Cancelled) matching React Web App style
+            // Row 1: Status Tabs (All, Drafts, Printed, Cancelled)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -250,7 +253,7 @@ fun HomeScreen(
                 }
             }
 
-            // Row 3: Search input + Export Buttons
+            // Row 3: Search input + Export Buttons (Export is owner-only)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -278,29 +281,31 @@ fun HomeScreen(
                     shape = RoundedCornerShape(8.dp)
                 )
 
-                // Export Button
-                OutlinedButton(
-                    onClick = {
-                        val csv = BillUtils.billsToCsv(filteredBills)
-                        val intent = Intent(Intent.ACTION_SEND).apply {
-                            type = "text/csv"
-                            putExtra(Intent.EXTRA_SUBJECT, "Mayur_Masala_Bills.csv")
-                            putExtra(Intent.EXTRA_TEXT, csv)
-                        }
-                        context.startActivity(Intent.createChooser(intent, "Export Bills (Excel / CSV)"))
-                    },
-                    modifier = Modifier.height(48.dp),
-                    shape = RoundedCornerShape(8.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        containerColor = Color(0xFF161B22),
-                        contentColor = Color.White
-                    ),
-                    border = ButtonDefaults.outlinedButtonBorder.copy(
-                        brush = androidx.compose.ui.graphics.SolidColor(Color(0xFF30363D))
-                    ),
-                    contentPadding = PaddingValues(horizontal = 12.dp)
-                ) {
-                    Text("⬇️ Bills (Excel)", fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                // Export Button — ONLY visible to Owner
+                if (isOwner) {
+                    OutlinedButton(
+                        onClick = {
+                            val csv = BillUtils.billsToCsv(filteredBills)
+                            val intent = Intent(Intent.ACTION_SEND).apply {
+                                type = "text/csv"
+                                putExtra(Intent.EXTRA_SUBJECT, "Mayur_Masala_Bills.csv")
+                                putExtra(Intent.EXTRA_TEXT, csv)
+                            }
+                            context.startActivity(Intent.createChooser(intent, "Export Bills (Excel / CSV)"))
+                        },
+                        modifier = Modifier.height(48.dp),
+                        shape = RoundedCornerShape(8.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            containerColor = Color(0xFF161B22),
+                            contentColor = Color.White
+                        ),
+                        border = ButtonDefaults.outlinedButtonBorder.copy(
+                            brush = androidx.compose.ui.graphics.SolidColor(Color(0xFF30363D))
+                        ),
+                        contentPadding = PaddingValues(horizontal = 12.dp)
+                    ) {
+                        Text("⬇️ Bills (Excel)", fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                    }
                 }
             }
 
@@ -334,8 +339,59 @@ fun HomeScreen(
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     items(filteredBills, key = { it.id }) { bill ->
-                        BillCard(bill = bill, onClick = { onBillClick(bill.id) })
+                        BillCard(
+                            bill = bill,
+                            showTotal = isOwner,
+                            onClick = { onBillClick(bill.id) }
+                        )
                     }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun BillCard(bill: Bill, showTotal: Boolean = true, onClick: () -> Unit) {
+    val statusColor = when (bill.status) {
+        "final" -> Color(0xFF00C9A7)
+        "cancelled" -> Color(0xFFFF6B6B)
+        else -> Color(0xFF8B949E)
+    }
+    val statusLabel = when (bill.status) {
+        "final" -> "Printed"
+        "cancelled" -> "Cancelled"
+        else -> "Draft"
+    }
+    Card(
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF161B22))
+    ) {
+        Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(BillUtils.billNo(bill), fontSize = 13.sp, color = Color(0xFF8B949E))
+                Text(bill.customerName, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(BillUtils.formatTime(bill.createdAt), fontSize = 12.sp, color = Color(0xFF8B949E))
+                    bill.createdBy?.let { staff ->
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            "👤 ${staff.substringBefore("@")}",
+                            fontSize = 11.sp,
+                            color = Color(0xFF00C9A7).copy(alpha = 0.8f)
+                        )
+                    }
+                }
+            }
+            Column(horizontalAlignment = Alignment.End) {
+                // If staff: hide total sales money amount! Only Owner sees ₹ amount
+                if (showTotal) {
+                    Text("₹${String.format(Locale.US, "%.2f", bill.totalAmount)}", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                    Spacer(Modifier.height(4.dp))
+                }
+                Surface(color = statusColor.copy(alpha = 0.15f), shape = MaterialTheme.shapes.small) {
+                    Text(statusLabel, modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                        fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = statusColor)
                 }
             }
         }

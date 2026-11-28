@@ -3,9 +3,11 @@ package `in`.stellarforge.billing.ui.viewmodels
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import `in`.stellarforge.billing.auth.AuthManager
 import `in`.stellarforge.billing.data.dao.*
 import `in`.stellarforge.billing.data.db.AppDatabase
 import `in`.stellarforge.billing.data.model.*
+import `in`.stellarforge.billing.printer.UpiConfig
 import `in`.stellarforge.billing.util.BillUtils
 import `in`.stellarforge.billing.util.DeviceManager
 import kotlinx.coroutines.flow.*
@@ -42,7 +44,8 @@ class BillViewModel @Inject constructor(
     private val customerDao: CustomerDao,
     private val shopSettingDao: ShopSettingDao,
     private val syncOutboxDao: SyncOutboxDao,
-    private val deviceManager: DeviceManager
+    private val deviceManager: DeviceManager,
+    private val authManager: AuthManager
 ) : ViewModel() {
 
     val allBills: StateFlow<List<Bill>> = billDao.getAllBills()
@@ -53,6 +56,14 @@ class BillViewModel @Inject constructor(
 
     val allCustomers: StateFlow<List<Customer>> = customerDao.getAllCustomers()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val upiConfigFlow: StateFlow<UpiConfig?> = shopSettingDao.getSettingByKeyFlow("upi_config")
+        .map { setting ->
+            if (setting != null) {
+                try { UpiConfig.fromJson(setting.valueJson) } catch (_: Exception) { null }
+            } else null
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
     private val _newBillState = MutableStateFlow(NewBillUiState())
     val newBillState: StateFlow<NewBillUiState> = _newBillState
@@ -85,10 +96,11 @@ class BillViewModel @Inject constructor(
         }
     }
 
-    fun saveBill(asFinal: Boolean, createdBy: String? = null) {
+    fun saveBill(asFinal: Boolean) {
         viewModelScope.launch {
             val s = _newBillState.value
             val deviceId = deviceManager.deviceId
+            val userEmail = authManager.getCurrentEmail()
 
             if (s.customerName.isBlank()) {
                 _newBillState.update { it.copy(error = "Customer name is required") }; return@launch
@@ -129,7 +141,7 @@ class BillViewModel @Inject constructor(
                 paymentMode = s.paymentMode,
                 totalAmount = total, discountPercent = pct, discountAmount = discountVal,
                 status = if (asFinal) "final" else "draft",
-                billingDate = s.billingDate, createdBy = createdBy, deviceId = deviceId,
+                billingDate = s.billingDate, createdBy = userEmail, deviceId = deviceId,
                 createdAt = now, updatedAt = now
             )
             val billItems = items.map { it.copy(billId = billId) }

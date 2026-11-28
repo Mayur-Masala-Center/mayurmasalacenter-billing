@@ -82,9 +82,23 @@ fun DashboardScreen(
     val today = BillUtils.todayIST()
     val todayFinal = bills.filter { it.status == "final" && (it.billingDate == today || it.billingDate == null) }
     val todayTotal = todayFinal.sumOf { it.totalAmount }
+
+    // Load active UPI Config from Database/Supabase Sync
+    val currentUpiConfig by viewModel.upiConfigFlow.collectAsState()
     var upiEnabled by remember { mutableStateOf(false) }
     var upiId by remember { mutableStateOf("") }
     var payeeName by remember { mutableStateOf("") }
+    var isInitialized by remember { mutableStateOf(false) }
+
+    LaunchedEffect(currentUpiConfig) {
+        if (!isInitialized && currentUpiConfig != null) {
+            upiEnabled = currentUpiConfig?.enabled ?: false
+            upiId = currentUpiConfig?.upiId ?: ""
+            payeeName = currentUpiConfig?.payeeName ?: ""
+            isInitialized = true
+        }
+    }
+
     var lastSynced by remember { mutableStateOf("Ready") }
 
     Scaffold(containerColor = Color(0xFF0D1117)) { padding ->
@@ -169,7 +183,7 @@ fun DashboardScreen(
                 }
             }
 
-            // UPI QR Settings
+            // UPI QR Settings (Populated from Supabase store_settings)
             item {
                 Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF161B22))) {
                     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {

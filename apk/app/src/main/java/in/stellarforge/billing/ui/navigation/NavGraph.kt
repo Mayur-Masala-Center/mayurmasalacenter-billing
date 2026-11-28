@@ -56,6 +56,7 @@ fun BillingNavGraph(
                 return@composable
             }
             HomeScreen(
+                currentUser = authState.user,
                 onBillClick = { billId -> navController.navigate(Routes.billDetail(billId)) },
                 onNewBill = { navController.navigate(Routes.NEW_BILL) },
                 printerManager = printerManager
