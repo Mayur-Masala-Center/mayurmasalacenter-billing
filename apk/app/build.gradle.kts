@@ -114,11 +114,11 @@ dependencies {
     // Navigation
     implementation("androidx.navigation:navigation-compose:2.8.3")
 
-    // Supabase (v3.1.4 — group: io.github.jan-tennert.supabase, auth-kt replaces gotrue-kt, compatible with AGP 8.7 & compileSdk 35)
-    implementation(platform("io.github.jan-tennert.supabase:bom:3.1.4"))
+    // Supabase (v3.0.3 — group: io.github.jan-tennert.supabase, auth-kt, compatible with Kotlin 2.0.21 & Hilt 2.51.1)
+    implementation(platform("io.github.jan-tennert.supabase:bom:3.0.3"))
     implementation("io.github.jan-tennert.supabase:postgrest-kt")
     implementation("io.github.jan-tennert.supabase:auth-kt")
-    implementation("io.ktor:ktor-client-android:3.1.2")
+    implementation("io.ktor:ktor-client-android:3.0.2")
 
     // Serialization
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
