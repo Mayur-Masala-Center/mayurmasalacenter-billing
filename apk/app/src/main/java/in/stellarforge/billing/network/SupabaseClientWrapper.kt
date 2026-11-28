@@ -7,9 +7,11 @@ import io.github.jan.supabase.createSupabaseClient
 import io.github.jan.supabase.auth.Auth
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.auth.providers.builtin.Email
+import io.github.jan.supabase.auth.user.UserSession
 import io.github.jan.supabase.postgrest.Postgrest
 import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.postgrest.query.Order
+import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.JsonObject
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -24,6 +26,30 @@ class SupabaseClientWrapper @Inject constructor(
     ) {
         install(Auth)
         install(Postgrest)
+    }
+
+    init {
+        // Restore saved JWT session so RLS-protected API calls succeed after app restart
+        val accessToken = authManager.getAccessToken()
+        val refreshToken = authManager.getRefreshToken()
+        if (!accessToken.isNullOrBlank() && !refreshToken.isNullOrBlank()) {
+            try {
+                runBlocking {
+                    client.auth.importSession(
+                        UserSession(
+                            accessToken = accessToken,
+                            refreshToken = refreshToken,
+                            expiresIn = 3600,
+                            tokenType = "bearer",
+                            user = null
+                        )
+                    )
+                    DebugLog.log("Auth", "Session restored from encrypted prefs")
+                }
+            } catch (e: Exception) {
+                DebugLog.log("Auth", "Session restore failed: ${e.message}")
+            }
+        }
     }
 
     suspend fun signIn(email: String, password: String): Result<Unit> {

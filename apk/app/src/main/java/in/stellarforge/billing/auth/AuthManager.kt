@@ -56,6 +56,7 @@ class AuthManager @Inject constructor(
     }
 
     fun getAccessToken(): String? = prefs.getString("access_token", null)
+    fun getRefreshToken(): String? = prefs.getString("refresh_token", null)
     fun getCurrentEmail(): String? = prefs.getString("user_email", null)
 
     fun saveSession(email: String, accessToken: String, refreshToken: String = "") {
