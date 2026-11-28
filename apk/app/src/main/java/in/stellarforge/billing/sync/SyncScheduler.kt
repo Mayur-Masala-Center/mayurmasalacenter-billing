@@ -1,4 +1,4 @@
-package in.stellarforge.billing.sync
+package `in`.stellarforge.billing.sync
 
 import android.content.Context
 import androidx.work.*

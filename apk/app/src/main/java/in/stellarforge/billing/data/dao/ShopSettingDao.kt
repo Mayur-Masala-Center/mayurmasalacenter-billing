@@ -1,7 +1,7 @@
-package in.stellarforge.billing.data.dao
+package `in`.stellarforge.billing.data.dao
 
 import androidx.room.*
-import in.stellarforge.billing.data.model.ShopSetting
+import `in`.stellarforge.billing.data.model.ShopSetting
 
 @Dao
 interface ShopSettingDao {

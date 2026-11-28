@@ -1,8 +1,8 @@
-package in.stellarforge.billing.network
+package `in`.stellarforge.billing.network
 
-import in.stellarforge.billing.BuildConfig
-import in.stellarforge.billing.auth.AuthManager
-import in.stellarforge.billing.sync.DebugLog
+import `in`.stellarforge.billing.BuildConfig
+import `in`.stellarforge.billing.auth.AuthManager
+import `in`.stellarforge.billing.sync.DebugLog
 import io.github.jan.supabase.createSupabaseClient
 import io.github.jan.supabase.auth.Auth
 import io.github.jan.supabase.auth.auth

@@ -1,4 +1,4 @@
-package in.stellarforge.billing.ui.screens
+package `in`.stellarforge.billing.ui.screens
 
 import android.Manifest
 import android.bluetooth.BluetoothAdapter
@@ -24,8 +24,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
-import in.stellarforge.billing.printer.BluetoothPrinterManager
-import in.stellarforge.billing.printer.PrintState
+import `in`.stellarforge.billing.printer.BluetoothPrinterManager
+import `in`.stellarforge.billing.printer.PrintState
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)

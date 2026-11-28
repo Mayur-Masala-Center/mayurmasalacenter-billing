@@ -1,4 +1,4 @@
-package in.stellarforge.billing.auth
+package `in`.stellarforge.billing.auth
 
 import android.content.Context
 import androidx.security.crypto.EncryptedSharedPreferences

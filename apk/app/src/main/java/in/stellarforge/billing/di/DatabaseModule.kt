@@ -1,4 +1,4 @@
-package in.stellarforge.billing.di
+package `in`.stellarforge.billing.di
 
 import android.content.Context
 import androidx.room.Room
@@ -7,8 +7,8 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
-import in.stellarforge.billing.data.db.AppDatabase
-import in.stellarforge.billing.data.db.MIGRATION_1_2
+import `in`.stellarforge.billing.data.db.AppDatabase
+import `in`.stellarforge.billing.data.db.MIGRATION_1_2
 import javax.inject.Singleton
 
 @Module

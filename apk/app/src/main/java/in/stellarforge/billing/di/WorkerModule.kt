@@ -1,4 +1,4 @@
-package in.stellarforge.billing.di
+package `in`.stellarforge.billing.di
 
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration

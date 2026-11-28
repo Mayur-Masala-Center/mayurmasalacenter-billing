@@ -1,4 +1,4 @@
-package in.stellarforge.billing.ui.screens
+package `in`.stellarforge.billing.ui.screens
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -16,9 +16,9 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
-import in.stellarforge.billing.printer.BluetoothPrinterManager
-import in.stellarforge.billing.ui.viewmodels.BillViewModel
-import in.stellarforge.billing.ui.viewmodels.LineItem
+import `in`.stellarforge.billing.printer.BluetoothPrinterManager
+import `in`.stellarforge.billing.ui.viewmodels.BillViewModel
+import `in`.stellarforge.billing.ui.viewmodels.LineItem
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
 

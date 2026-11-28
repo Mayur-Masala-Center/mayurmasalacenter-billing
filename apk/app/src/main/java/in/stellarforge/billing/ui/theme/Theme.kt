@@ -1,4 +1,4 @@
-package in.stellarforge.billing.ui.theme
+package `in`.stellarforge.billing.ui.theme
 
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme

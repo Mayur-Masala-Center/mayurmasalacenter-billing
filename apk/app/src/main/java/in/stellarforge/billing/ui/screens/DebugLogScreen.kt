@@ -1,4 +1,4 @@
-package in.stellarforge.billing.ui.screens
+package `in`.stellarforge.billing.ui.screens
 
 import android.content.Intent
 import androidx.compose.foundation.layout.*
@@ -17,7 +17,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import in.stellarforge.billing.sync.DebugLog
+import `in`.stellarforge.billing.sync.DebugLog
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

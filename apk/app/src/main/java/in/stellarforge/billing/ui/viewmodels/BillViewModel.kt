@@ -1,13 +1,13 @@
-package in.stellarforge.billing.ui.viewmodels
+package `in`.stellarforge.billing.ui.viewmodels
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
-import in.stellarforge.billing.data.dao.*
-import in.stellarforge.billing.data.db.AppDatabase
-import in.stellarforge.billing.data.model.*
-import in.stellarforge.billing.util.BillUtils
-import in.stellarforge.billing.util.DeviceManager
+import `in`.stellarforge.billing.data.dao.*
+import `in`.stellarforge.billing.data.db.AppDatabase
+import `in`.stellarforge.billing.data.model.*
+import `in`.stellarforge.billing.util.BillUtils
+import `in`.stellarforge.billing.util.DeviceManager
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject

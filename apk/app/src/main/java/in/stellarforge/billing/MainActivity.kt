@@ -1,4 +1,4 @@
-package in.stellarforge.billing
+package `in`.stellarforge.billing
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -11,12 +11,12 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.navigation.compose.rememberNavController
 import dagger.hilt.android.AndroidEntryPoint
-import in.stellarforge.billing.auth.AuthState
-import in.stellarforge.billing.printer.BluetoothPrinterManager
-import in.stellarforge.billing.ui.components.BottomNavBar
-import in.stellarforge.billing.ui.navigation.BillingNavGraph
-import in.stellarforge.billing.ui.theme.StellarForgeBillingTheme
-import in.stellarforge.billing.ui.viewmodels.AuthViewModel
+import `in`.stellarforge.billing.auth.AuthState
+import `in`.stellarforge.billing.printer.BluetoothPrinterManager
+import `in`.stellarforge.billing.ui.components.BottomNavBar
+import `in`.stellarforge.billing.ui.navigation.BillingNavGraph
+import `in`.stellarforge.billing.ui.theme.StellarForgeBillingTheme
+import `in`.stellarforge.billing.ui.viewmodels.AuthViewModel
 import javax.inject.Inject
 
 @AndroidEntryPoint

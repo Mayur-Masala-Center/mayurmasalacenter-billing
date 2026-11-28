@@ -1,4 +1,4 @@
-package in.stellarforge.billing.data.model
+package `in`.stellarforge.billing.data.model
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey

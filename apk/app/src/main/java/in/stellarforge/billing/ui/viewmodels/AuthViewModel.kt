@@ -1,11 +1,11 @@
-package in.stellarforge.billing.ui.viewmodels
+package `in`.stellarforge.billing.ui.viewmodels
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
-import in.stellarforge.billing.auth.AuthManager
-import in.stellarforge.billing.auth.AuthState
-import in.stellarforge.billing.network.SupabaseClientWrapper
+import `in`.stellarforge.billing.auth.AuthManager
+import `in`.stellarforge.billing.auth.AuthState
+import `in`.stellarforge.billing.network.SupabaseClientWrapper
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject

@@ -1,14 +1,14 @@
-package in.stellarforge.billing.ui.viewmodels
+package `in`.stellarforge.billing.ui.viewmodels
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
-import in.stellarforge.billing.data.dao.ItemDao
-import in.stellarforge.billing.data.dao.SyncOutboxDao
-import in.stellarforge.billing.data.model.Item
-import in.stellarforge.billing.data.model.SyncOutbox
-import in.stellarforge.billing.util.BillUtils
-import in.stellarforge.billing.util.DeviceManager
+import `in`.stellarforge.billing.data.dao.ItemDao
+import `in`.stellarforge.billing.data.dao.SyncOutboxDao
+import `in`.stellarforge.billing.data.model.Item
+import `in`.stellarforge.billing.data.model.SyncOutbox
+import `in`.stellarforge.billing.util.BillUtils
+import `in`.stellarforge.billing.util.DeviceManager
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject

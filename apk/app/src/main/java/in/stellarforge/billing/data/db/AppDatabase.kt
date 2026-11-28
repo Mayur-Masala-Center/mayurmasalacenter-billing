@@ -1,10 +1,10 @@
-package in.stellarforge.billing.data.db
+package `in`.stellarforge.billing.data.db
 
 import androidx.room.*
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
-import in.stellarforge.billing.data.dao.*
-import in.stellarforge.billing.data.model.*
+import `in`.stellarforge.billing.data.dao.*
+import `in`.stellarforge.billing.data.model.*
 
 val MIGRATION_1_2 = object : Migration(1, 2) {
     override fun migrate(db: SupportSQLiteDatabase) {

@@ -1,4 +1,4 @@
-package in.stellarforge.billing.sync
+package `in`.stellarforge.billing.sync
 
 import android.content.Context
 import androidx.hilt.work.HiltWorker
@@ -7,10 +7,10 @@ import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
-import in.stellarforge.billing.data.dao.*
-import in.stellarforge.billing.data.db.AppDatabase
-import in.stellarforge.billing.data.model.*
-import in.stellarforge.billing.network.SupabaseClientWrapper
+import `in`.stellarforge.billing.data.dao.*
+import `in`.stellarforge.billing.data.db.AppDatabase
+import `in`.stellarforge.billing.data.model.*
+import `in`.stellarforge.billing.network.SupabaseClientWrapper
 import kotlinx.serialization.json.*
 import java.text.SimpleDateFormat
 import java.util.Locale

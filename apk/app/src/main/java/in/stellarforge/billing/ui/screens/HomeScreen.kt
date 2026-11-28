@@ -1,4 +1,4 @@
-package in.stellarforge.billing.ui.screens
+package `in`.stellarforge.billing.ui.screens
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -18,13 +18,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
-import in.stellarforge.billing.data.model.Bill
-import in.stellarforge.billing.printer.BluetoothPrinterManager
-import in.stellarforge.billing.sync.SyncScheduler
-import in.stellarforge.billing.sync.SyncState
-import in.stellarforge.billing.sync.SyncStatusMonitor
-import in.stellarforge.billing.ui.viewmodels.BillViewModel
-import in.stellarforge.billing.util.BillUtils
+import `in`.stellarforge.billing.data.model.Bill
+import `in`.stellarforge.billing.printer.BluetoothPrinterManager
+import `in`.stellarforge.billing.sync.SyncScheduler
+import `in`.stellarforge.billing.sync.SyncState
+import `in`.stellarforge.billing.sync.SyncStatusMonitor
+import `in`.stellarforge.billing.ui.viewmodels.BillViewModel
+import `in`.stellarforge.billing.util.BillUtils
 import kotlinx.coroutines.launch
 
 @Composable

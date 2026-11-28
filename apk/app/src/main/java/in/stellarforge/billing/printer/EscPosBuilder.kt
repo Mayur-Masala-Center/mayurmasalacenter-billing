@@ -1,4 +1,4 @@
-package in.stellarforge.billing.printer
+package `in`.stellarforge.billing.printer
 
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -8,10 +8,10 @@ import android.graphics.Typeface
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.EncodeHintType
 import com.google.zxing.qrcode.QRCodeWriter
-import in.stellarforge.billing.data.model.Bill
-import in.stellarforge.billing.data.model.BillItem
-import in.stellarforge.billing.sync.DebugLog
-import in.stellarforge.billing.util.BillUtils
+import `in`.stellarforge.billing.data.model.Bill
+import `in`.stellarforge.billing.data.model.BillItem
+import `in`.stellarforge.billing.sync.DebugLog
+import `in`.stellarforge.billing.util.BillUtils
 import java.io.ByteArrayOutputStream
 
 class EscPosBuilder(private val paperWidthMm: Int = 80) {

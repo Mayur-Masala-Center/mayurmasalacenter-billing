@@ -1,4 +1,4 @@
-package in.stellarforge.billing.printer
+package `in`.stellarforge.billing.printer
 
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
@@ -6,10 +6,10 @@ import android.bluetooth.BluetoothManager
 import android.content.Context
 import android.graphics.BitmapFactory
 import dagger.hilt.android.qualifiers.ApplicationContext
-import in.stellarforge.billing.data.dao.ShopSettingDao
-import in.stellarforge.billing.data.model.Bill
-import in.stellarforge.billing.data.model.BillItem
-import in.stellarforge.billing.sync.DebugLog
+import `in`.stellarforge.billing.data.dao.ShopSettingDao
+import `in`.stellarforge.billing.data.model.Bill
+import `in`.stellarforge.billing.data.model.BillItem
+import `in`.stellarforge.billing.sync.DebugLog
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow

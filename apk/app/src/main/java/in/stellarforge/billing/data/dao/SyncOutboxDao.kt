@@ -1,7 +1,7 @@
-package in.stellarforge.billing.data.dao
+package `in`.stellarforge.billing.data.dao
 
 import androidx.room.*
-import in.stellarforge.billing.data.model.SyncOutbox
+import `in`.stellarforge.billing.data.model.SyncOutbox
 
 @Dao
 interface SyncOutboxDao {

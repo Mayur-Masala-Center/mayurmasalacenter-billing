@@ -1,4 +1,4 @@
-package in.stellarforge.billing.ui.navigation
+package `in`.stellarforge.billing.ui.navigation
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -7,9 +7,9 @@ import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
-import in.stellarforge.billing.auth.AuthState
-import in.stellarforge.billing.printer.BluetoothPrinterManager
-import in.stellarforge.billing.ui.screens.*
+import `in`.stellarforge.billing.auth.AuthState
+import `in`.stellarforge.billing.printer.BluetoothPrinterManager
+import `in`.stellarforge.billing.ui.screens.*
 
 object Routes {
     const val LOGIN = "login"

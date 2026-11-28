@@ -1,4 +1,4 @@
-package in.stellarforge.billing.sync
+package `in`.stellarforge.billing.sync
 
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow

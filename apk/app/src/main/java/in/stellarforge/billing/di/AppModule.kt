@@ -1,9 +1,9 @@
-package in.stellarforge.billing.di
+package `in`.stellarforge.billing.di
 
 import android.content.Context
-import in.stellarforge.billing.auth.AuthManager
-import in.stellarforge.billing.network.SupabaseClientWrapper
-import in.stellarforge.billing.util.DeviceManager
+import `in`.stellarforge.billing.auth.AuthManager
+import `in`.stellarforge.billing.network.SupabaseClientWrapper
+import `in`.stellarforge.billing.util.DeviceManager
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
