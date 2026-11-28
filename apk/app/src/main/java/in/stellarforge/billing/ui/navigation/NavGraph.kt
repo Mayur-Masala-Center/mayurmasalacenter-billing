@@ -95,6 +95,7 @@ fun BillingNavGraph(
             val billId = backStackEntry.arguments?.getString("billId") ?: return@composable
             BillDetailScreen(
                 billId = billId,
+                currentUser = authState.user,
                 onBack = { navController.popBackStack() },
                 printerManager = printerManager
             )
