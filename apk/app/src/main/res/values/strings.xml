@@ -1,3 +1,25 @@
 <resources>
     <string name="app_name">Mayur Masala Billing</string>
+    <string name="subtitle">by Stellar Forge</string>
+    <string name="sign_in">Sign In</string>
+    <string name="email">Email</string>
+    <string name="password">Password</string>
+    <string name="todays_bills">Today\'s Bills</string>
+    <string name="no_bills_today">No bills today</string>
+    <string name="tap_to_create">Tap + to create one</string>
+    <string name="new_bill">New Bill</string>
+    <string name="customer_name">Customer Name</string>
+    <string name="payment_mode">Payment Mode</string>
+    <string name="items">Items</string>
+    <string name="add">Add</string>
+    <string name="subtotal">Subtotal</string>
+    <string name="discount">Discount</string>
+    <string name="total">TOTAL</string>
+    <string name="save_draft">Save Draft</string>
+    <string name="save_and_print">Save &amp; Print</string>
+    <string name="reprint_last_bill">Reprint Last Bill</string>
+    <string name="cancel_bill">Cancel Bill</string>
+    <string name="printer_setup">Printer Setup</string>
+    <string name="dashboard">Dashboard</string>
+    <string name="debug_log">Debug Log</string>
 </resources>

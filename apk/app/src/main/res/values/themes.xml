@@ -1,3 +1,7 @@
 <resources>
-    <style name="Theme.StellarForgeBilling" parent="android:Theme.Material.Light.NoActionBar" />
+    <style name="Theme.StellarForgeBilling" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:statusBarColor">#0D1117</item>
+        <item name="android:navigationBarColor">#161B22</item>
+        <item name="android:windowBackground">#0D1117</item>
+    </style>
 </resources>
